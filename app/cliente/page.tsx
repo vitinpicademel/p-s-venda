@@ -69,7 +69,7 @@ const mockSteps = [
 
 const processInfo = {
   clientName: "Maria Silva",
-  propertyAddress: "Rua das Flores, 123 - Centro, São Paulo/SP",
+  propertyAddress: "Rua das Flores, 123 - Centro, Uberaba/MG",
   propertyValue: 450000,
   createdAt: "2024-01-15",
 };
@@ -125,7 +125,7 @@ export default function ClientePage() {
                 <Home className="h-6 w-6 text-[#302521]" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-[#d4a574]">Donna Imobiliária</h1>
+                <h1 className="text-2xl font-bold text-[#d4a574]">Donna Negociações Imobiliárias</h1>
                 <p className="text-sm text-amber-100">Acompanhamento do Processo</p>
               </div>
             </div>

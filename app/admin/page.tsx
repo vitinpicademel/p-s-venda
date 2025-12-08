@@ -70,7 +70,7 @@ const initialClients: Client[] = [
     id: "1",
     clientName: "Maria Silva",
     clientEmail: "maria.silva@email.com",
-    propertyAddress: "Rua das Flores, 123 - Centro, São Paulo/SP",
+    propertyAddress: "Rua das Flores, 123 - Centro, Uberaba/MG",
     propertyValue: 450000,
     status: "in_progress",
     stepsCompleted: 3,
@@ -81,7 +81,7 @@ const initialClients: Client[] = [
     id: "2",
     clientName: "João Santos",
     clientEmail: "joao.santos@email.com",
-    propertyAddress: "Av. Paulista, 1000 - Bela Vista, São Paulo/SP",
+    propertyAddress: "Av. Leopoldino de Oliveira, 1000 - Centro, Uberaba/MG",
     propertyValue: 850000,
     status: "in_progress",
     stepsCompleted: 4,
@@ -92,7 +92,7 @@ const initialClients: Client[] = [
     id: "3",
     clientName: "Ana Costa",
     clientEmail: "ana.costa@email.com",
-    propertyAddress: "Rua Augusta, 500 - Consolação, São Paulo/SP",
+    propertyAddress: "Rua Artur Machado, 500 - Centro, Uberaba/MG",
     propertyValue: 320000,
     status: "in_progress",
     stepsCompleted: 2,
@@ -403,7 +403,7 @@ export default function AdminPage() {
                 <Home className="h-6 w-6 text-[#302521]" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-[#d4a574]">Donna Imobiliária</h1>
+                <h1 className="text-2xl font-bold text-[#d4a574]">Donna Negociações Imobiliárias</h1>
                 <p className="text-sm text-amber-100">Painel Administrativo</p>
               </div>
             </div>

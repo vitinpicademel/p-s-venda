@@ -50,7 +50,7 @@ export default function LoginPage() {
             </div>
           </div>
           <CardTitle className="text-3xl font-bold text-[#302521]">
-            Donna Imobiliária
+            Donna Negociações Imobiliárias
           </CardTitle>
           <CardDescription className="text-base text-slate-600">
             Sistema de Acompanhamento Pós-Venda
