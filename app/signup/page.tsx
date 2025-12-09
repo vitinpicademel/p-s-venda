@@ -7,13 +7,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Home, AlertCircle } from "lucide-react";
+import { Home, AlertCircle, ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ToastContainer, useToast } from "@/components/ui/toast";
 
-export default function LoginPage() {
+export default function SignUpPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
@@ -24,7 +25,7 @@ export default function LoginPage() {
     return createClient();
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setIsLoading(true);
@@ -37,34 +38,37 @@ export default function LoginPage() {
     }
 
     try {
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+      const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            full_name: fullName,
+            role: 'client',
+          },
+        },
       });
 
-      if (signInError) {
-        setError(signInError.message || "Email ou senha incorretos");
+      if (signUpError) {
+        setError(signUpError.message);
         setIsLoading(false);
         return;
       }
 
       if (data.user) {
-        // Busca o perfil do usuário para verificar o role
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", data.user.id)
-          .single();
+        showToast({
+          title: "Conta criada com sucesso!",
+          description: "Redirecionando para login...",
+          type: "success",
+        });
 
-        // Redireciona baseado no role
-        if (profile?.role === "admin") {
-          router.push("/admin");
-        } else {
-          router.push("/cliente");
-        }
+        // Aguarda um pouco e redireciona para login
+        setTimeout(() => {
+          router.push("/login");
+        }, 1500);
       }
     } catch (err) {
-      setError("Erro ao fazer login. Tente novamente.");
+      setError("Erro ao criar conta. Tente novamente.");
       setIsLoading(false);
     }
   };
@@ -91,11 +95,27 @@ export default function LoginPage() {
             Donna Negociações Imobiliárias
           </CardTitle>
           <CardDescription className="text-base text-slate-600">
-            Sistema de Acompanhamento Pós-Venda
+            Crie sua conta para acompanhar seu processo
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleSignUp} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="fullName" className="text-slate-700 font-medium">
+                Nome Completo
+              </Label>
+              <Input
+                id="fullName"
+                type="text"
+                placeholder="Seu nome completo"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                className="h-11 border-slate-200 focus:border-[#d4a574] focus:ring-[#d4a574]"
+                required
+                disabled={isLoading}
+              />
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="email" className="text-slate-700 font-medium">
                 Email
@@ -110,6 +130,9 @@ export default function LoginPage() {
                 required
                 disabled={isLoading}
               />
+              <p className="text-xs text-slate-500">
+                Use o mesmo email informado pela imobiliária
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -119,11 +142,12 @@ export default function LoginPage() {
               <Input
                 id="password"
                 type="password"
-                placeholder="Sua senha"
+                placeholder="Mínimo 6 caracteres"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="h-11 border-slate-200 focus:border-[#d4a574] focus:ring-[#d4a574]"
                 required
+                minLength={6}
                 disabled={isLoading}
               />
             </div>
@@ -140,16 +164,26 @@ export default function LoginPage() {
               className="w-full h-11 bg-[#d4a574] hover:bg-[#c49564] text-[#302521] font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
               disabled={isLoading}
             >
-              {isLoading ? "Entrando..." : "Entrar"}
+              {isLoading ? "Criando conta..." : "Criar Conta"}
             </Button>
 
             <div className="pt-4 border-t border-slate-200">
               <p className="text-xs text-center text-slate-500">
-                Não tem uma conta?{" "}
-                <Link href="/signup" className="text-[#d4a574] hover:underline font-medium">
-                  Criar conta
+                Já tem uma conta?{" "}
+                <Link href="/login" className="text-[#d4a574] hover:underline font-medium">
+                  Fazer login
                 </Link>
               </p>
+            </div>
+
+            <div className="pt-2">
+              <Link
+                href="/login"
+                className="flex items-center justify-center gap-2 text-sm text-slate-600 hover:text-[#302521] transition-colors"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Voltar para login
+              </Link>
             </div>
           </form>
         </CardContent>
@@ -183,3 +217,4 @@ export default function LoginPage() {
     </div>
   );
 }
+

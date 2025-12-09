@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,64 +15,27 @@ import {
   LogOut,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { ToastContainer, useToast } from "@/components/ui/toast";
 
-// Dados fictícios das etapas
-const mockSteps = [
-  {
-    id: "1",
-    stepOrder: 1,
-    stepName: "Upload do Contrato",
-    stepDescription: "Contrato PDF enviado pela imobiliária",
-    status: "completed",
-    completedAt: "2024-01-15T10:00:00Z",
-  },
-  {
-    id: "2",
-    stepOrder: 2,
-    stepName: "Engenharia do banco",
-    stepDescription: "Análise e aprovação do financiamento bancário",
-    status: "completed",
-    completedAt: "2024-01-20T14:30:00Z",
-  },
-  {
-    id: "3",
-    stepOrder: 3,
-    stepName: "Assinatura do contrato bancário",
-    stepDescription: "Assinatura do contrato de financiamento",
-    status: "completed",
-    completedAt: "2024-01-25T09:15:00Z",
-  },
-  {
-    id: "4",
-    stepOrder: 4,
-    stepName: "Recolhimento de ITBI",
-    stepDescription: "Pagamento do Imposto sobre Transmissão de Bens Imóveis",
-    status: "pending",
-    completedAt: null,
-  },
-  {
-    id: "5",
-    stepOrder: 5,
-    stepName: "Entrada cartório para registro",
-    stepDescription: "Registro da escritura no cartório",
-    status: "pending",
-    completedAt: null,
-  },
-  {
-    id: "6",
-    stepOrder: 6,
-    stepName: "Processo Finalizado",
-    stepDescription: "Entrega das chaves e conclusão do processo",
-    status: "pending",
-    completedAt: null,
-  },
-];
-
-const processInfo = {
-  clientName: "Maria Silva",
-  propertyAddress: "Rua das Flores, 123 - Centro, Uberaba/MG",
-  propertyValue: 450000,
-  createdAt: "2024-01-15",
+type Process = {
+  id: string;
+  client_name: string;
+  client_email: string;
+  property_address: string | null;
+  property_value: number | null;
+  contract_url: string | null;
+  contract_filename: string | null;
+  status_steps: {
+    upload: boolean;
+    engineering: boolean;
+    signature: boolean;
+    itbi: boolean;
+    registry: boolean;
+    delivery: boolean;
+  };
+  status: "in_progress" | "completed";
+  created_at: string;
 };
 
 const getStepIcon = (stepName: string) => {
@@ -81,14 +45,69 @@ const getStepIcon = (stepName: string) => {
   if (name.includes("assinatura")) return FileCheck;
   if (name.includes("itbi")) return Receipt;
   if (name.includes("cartório") || name.includes("registro")) return ScrollText;
-  if (name.includes("finalizado")) return Home;
+  if (name.includes("finalizado") || name.includes("entrega")) return Home;
   return FileText;
 };
 
 export default function ClientePage() {
   const router = useRouter();
+  const [process, setProcess] = useState<Process | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const { toasts, showToast, removeToast } = useToast();
 
-  const handleLogout = () => {
+  const getSupabaseClient = () => {
+    if (typeof window === 'undefined') return null;
+    return createClient();
+  };
+
+  useEffect(() => {
+    fetchProcess();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const fetchProcess = async () => {
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+
+    try {
+      setIsLoading(true);
+      
+      // Busca o usuário logado
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.email) {
+        router.push("/login");
+        return;
+      }
+
+      // Busca processo pelo email do cliente
+      const { data, error } = await supabase
+        .from("processes")
+        .select("*")
+        .eq("client_email", user.email)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data) {
+        setProcess(data as Process);
+      }
+    } catch (error) {
+      console.error("Erro ao buscar processo:", error);
+      showToast({
+        title: "Erro ao carregar processo",
+        description: "Tente recarregar a página",
+        type: "error",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
     router.push("/login");
   };
 
@@ -99,8 +118,7 @@ export default function ClientePage() {
     }).format(value);
   };
 
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return null;
+  const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("pt-BR", {
       day: "2-digit",
       month: "long",
@@ -110,12 +128,30 @@ export default function ClientePage() {
     });
   };
 
-  const completedSteps = mockSteps.filter((step) => step.status === "completed").length;
-  const totalSteps = mockSteps.length - 1; // Exclui "Processo Finalizado" da contagem
-  const progressPercentage = (completedSteps / totalSteps) * 100;
+  const stepsConfig = [
+    { key: "upload" as const, name: "Upload do Contrato", description: "Contrato PDF enviado pela imobiliária", icon: FileText },
+    { key: "engineering" as const, name: "Engenharia do banco", description: "Análise e aprovação do financiamento bancário", icon: Building2 },
+    { key: "signature" as const, name: "Assinatura do contrato bancário", description: "Assinatura do contrato de financiamento", icon: FileCheck },
+    { key: "itbi" as const, name: "Recolhimento de ITBI", description: "Pagamento do Imposto sobre Transmissão de Bens Imóveis", icon: Receipt },
+    { key: "registry" as const, name: "Entrada cartório para registro", description: "Registro da escritura no cartório", icon: ScrollText },
+    { key: "delivery" as const, name: "Processo Finalizado", description: "Entrega das chaves e conclusão do processo", icon: Home },
+  ];
+
+  const completedSteps = process
+    ? [
+        process.status_steps.engineering,
+        process.status_steps.signature,
+        process.status_steps.itbi,
+        process.status_steps.registry,
+      ].filter(Boolean).length
+    : 0;
+  const totalSteps = 4;
+  const progressPercentage = process ? (completedSteps / totalSteps) * 100 : 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-50">
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
+
       {/* Header */}
       <header className="bg-[#302521] border-b border-[#302521] shadow-sm">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -139,133 +175,167 @@ export default function ClientePage() {
 
       {/* Main Content */}
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Info Card */}
-        <Card className="mb-8 border-slate-200 shadow-md">
-          <CardHeader>
-            <CardTitle className="text-xl text-slate-800">Informações do Processo</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <p className="text-sm font-medium text-slate-500 mb-1">Cliente</p>
-                <p className="text-base text-slate-800 font-semibold">{processInfo.clientName}</p>
+        {isLoading ? (
+          <Card className="text-center py-12">
+            <CardContent>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#d4a574] mx-auto mb-4"></div>
+              <p className="text-slate-500">Carregando seu processo...</p>
+            </CardContent>
+          </Card>
+        ) : !process ? (
+          /* Empty State */
+          <Card className="text-center py-12 border-slate-200 shadow-md">
+            <CardContent>
+              <div className="p-4 bg-amber-100 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
+                <FileText className="h-10 w-10 text-[#d4a574]" />
               </div>
-              <div>
-                <p className="text-sm font-medium text-slate-500 mb-1">Valor do Imóvel</p>
-                <p className="text-base text-[#d4a574] font-bold">
-                  {formatCurrency(processInfo.propertyValue)}
-                </p>
-              </div>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-slate-500 mb-1">Endereço do Imóvel</p>
-              <p className="text-base text-slate-700">{processInfo.propertyAddress}</p>
-            </div>
-            <div className="pt-4 border-t border-slate-100">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-slate-700">Progresso Geral</span>
-                <span className="text-sm font-semibold text-[#d4a574]">
-                  {completedSteps}/{totalSteps} etapas concluídas
-                </span>
-              </div>
-              <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
-                <div
-                  className="bg-[#d4a574] h-full rounded-full transition-all duration-500"
-                  style={{ width: `${progressPercentage}%` }}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              <h3 className="text-2xl font-semibold text-[#302521] mb-3">
+                Nenhum processo encontrado
+              </h3>
+              <p className="text-base text-slate-600 mb-2">
+                Não encontramos nenhum processo para este email.
+              </p>
+              <p className="text-sm text-slate-500 mb-6">
+                Entre em contato com a Donna Negociações Imobiliárias para mais informações.
+              </p>
+              <Button
+                onClick={handleLogout}
+                className="bg-[#d4a574] hover:bg-[#c49564] text-[#302521]"
+              >
+                Sair
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            {/* Info Card */}
+            <Card className="mb-8 border-slate-200 shadow-md">
+              <CardHeader>
+                <CardTitle className="text-xl text-slate-800">Informações do Processo</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <p className="text-sm font-medium text-slate-500 mb-1">Cliente</p>
+                    <p className="text-base text-slate-800 font-semibold">{process.client_name}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-slate-500 mb-1">Valor do Imóvel</p>
+                    <p className="text-base text-[#d4a574] font-bold">
+                      {process.property_value ? formatCurrency(process.property_value) : "Não informado"}
+                    </p>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-500 mb-1">Endereço do Imóvel</p>
+                  <p className="text-base text-slate-700">{process.property_address || "Não informado"}</p>
+                </div>
+                <div className="pt-4 border-t border-slate-100">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-slate-700">Progresso Geral</span>
+                    <span className="text-sm font-semibold text-[#d4a574]">
+                      {completedSteps}/{totalSteps} etapas concluídas
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+                    <div
+                      className="bg-[#d4a574] h-full rounded-full transition-all duration-500"
+                      style={{ width: `${progressPercentage}%` }}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-        {/* Timeline */}
-        <Card className="border-slate-200 shadow-md">
-          <CardHeader>
-            <CardTitle className="text-xl text-slate-800">Linha do Tempo do Processo</CardTitle>
-            <CardDescription>Acompanhe o status de cada etapa até a entrega das chaves</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="relative">
-              {/* Timeline Line */}
-              <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-slate-200" />
+            {/* Timeline */}
+            <Card className="border-slate-200 shadow-md">
+              <CardHeader>
+                <CardTitle className="text-xl text-slate-800">Linha do Tempo do Processo</CardTitle>
+                <CardDescription>Acompanhe o status de cada etapa até a entrega das chaves</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="relative">
+                  {/* Timeline Line */}
+                  <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-slate-200" />
 
-              {/* Steps */}
-              <div className="space-y-6">
-                {mockSteps.map((step, index) => {
-                  const Icon = getStepIcon(step.stepName);
-                  const isCompleted = step.status === "completed";
-                  const isLast = index === mockSteps.length - 1;
+                  {/* Steps */}
+                  <div className="space-y-6">
+                    {stepsConfig.map((stepConfig, index) => {
+                      const Icon = stepConfig.icon;
+                      const isCompleted = process.status_steps[stepConfig.key];
+                      const isLast = index === stepsConfig.length - 1;
 
-                  return (
-                    <div key={step.id} className="relative flex gap-4">
-                      {/* Icon Circle */}
-                      <div
-                        className={`relative z-10 flex items-center justify-center w-12 h-12 rounded-full border-2 transition-all duration-200 ${
-                          isCompleted
-                            ? "bg-[#d4a574] border-[#d4a574] text-[#302521] shadow-lg"
-                            : "bg-white border-slate-300 text-slate-400"
-                        }`}
-                      >
-                        {isCompleted ? (
-                          <CheckCircle2 className="h-6 w-6" />
-                        ) : (
-                          <Icon className="h-5 w-5" />
-                        )}
-                      </div>
-
-                      {/* Content */}
-                      <div className="flex-1 pb-6">
-                        <div
-                          className={`p-4 rounded-lg border transition-all duration-200 ${
-                            isCompleted
-                              ? "bg-amber-50 border-[#d4a574] shadow-sm"
-                              : "bg-slate-50 border-slate-200"
-                          }`}
-                        >
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1">
-                              <h3
-                                className={`font-semibold mb-1 ${
-                                  isCompleted ? "text-[#302521]" : "text-slate-700"
-                                }`}
-                              >
-                                {step.stepName}
-                              </h3>
-                              <p
-                                className={`text-sm ${
-                                  isCompleted ? "text-[#302521]" : "text-slate-600"
-                                }`}
-                              >
-                                {step.stepDescription}
-                              </p>
-                              {isCompleted && step.completedAt && (
-                                <p className="text-xs text-[#d4a574] mt-2 flex items-center gap-1">
-                                  <Clock className="h-3 w-3" />
-                                  Concluído em {formatDate(step.completedAt)}
-                                </p>
-                              )}
-                              {!isCompleted && (
-                                <p className="text-xs text-slate-500 mt-2 flex items-center gap-1">
-                                  <Clock className="h-3 w-3" />
-                                  Aguardando conclusão
-                                </p>
-                              )}
-                            </div>
-                            {isCompleted && (
-                              <CheckCircle2 className="h-5 w-5 text-[#d4a574] flex-shrink-0" />
+                      return (
+                        <div key={stepConfig.key} className="relative flex gap-4">
+                          {/* Icon Circle */}
+                          <div
+                            className={`relative z-10 flex items-center justify-center w-12 h-12 rounded-full border-2 transition-all duration-200 ${
+                              isCompleted
+                                ? "bg-[#d4a574] border-[#d4a574] text-[#302521] shadow-lg"
+                                : "bg-white border-slate-300 text-slate-400"
+                            }`}
+                          >
+                            {isCompleted ? (
+                              <CheckCircle2 className="h-6 w-6" />
+                            ) : (
+                              <Icon className="h-5 w-5" />
                             )}
                           </div>
+
+                          {/* Content */}
+                          <div className="flex-1 pb-6">
+                            <div
+                              className={`p-4 rounded-lg border transition-all duration-200 ${
+                                isCompleted
+                                  ? "bg-amber-50 border-[#d4a574] shadow-sm"
+                                  : "bg-slate-50 border-slate-200"
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="flex-1">
+                                  <h3
+                                    className={`font-semibold mb-1 ${
+                                      isCompleted ? "text-[#302521]" : "text-slate-700"
+                                    }`}
+                                  >
+                                    {stepConfig.name}
+                                  </h3>
+                                  <p
+                                    className={`text-sm ${
+                                      isCompleted ? "text-[#302521]" : "text-slate-600"
+                                    }`}
+                                  >
+                                    {stepConfig.description}
+                                  </p>
+                                  {isCompleted && (
+                                    <p className="text-xs text-[#d4a574] mt-2 flex items-center gap-1">
+                                      <Clock className="h-3 w-3" />
+                                      Etapa concluída
+                                    </p>
+                                  )}
+                                  {!isCompleted && (
+                                    <p className="text-xs text-slate-500 mt-2 flex items-center gap-1">
+                                      <Clock className="h-3 w-3" />
+                                      Aguardando conclusão
+                                    </p>
+                                  )}
+                                </div>
+                                {isCompleted && (
+                                  <CheckCircle2 className="h-5 w-5 text-[#d4a574] flex-shrink-0" />
+                                )}
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                      );
+                    })}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </main>
     </div>
   );
 }
-

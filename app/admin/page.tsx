@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,21 +38,30 @@ import {
   Receipt,
   ScrollText,
   KeyRound,
+  Search,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 
-// Tipo para cliente
-type Client = {
+// Tipo para processo (do Supabase)
+type Process = {
   id: string;
-  clientName: string;
-  clientEmail: string;
-  propertyAddress: string;
-  propertyValue: number;
+  client_name: string;
+  client_email: string;
+  property_address: string | null;
+  property_value: number | null;
+  contract_url: string | null;
+  contract_filename: string | null;
+  status_steps: {
+    upload: boolean;
+    engineering: boolean;
+    signature: boolean;
+    itbi: boolean;
+    registry: boolean;
+    delivery: boolean;
+  };
   status: "in_progress" | "completed";
-  stepsCompleted: number;
-  totalSteps: number;
-  createdAt: string;
-  contractFilename?: string;
+  created_at: string;
 };
 
 // Tipo para etapas
@@ -64,97 +73,27 @@ type ProcessStep = {
   completed: boolean;
 };
 
-// Dados fictícios iniciais
-const initialClients: Client[] = [
-  {
-    id: "1",
-    clientName: "Maria Silva",
-    clientEmail: "maria.silva@email.com",
-    propertyAddress: "Rua das Flores, 123 - Centro, Uberaba/MG",
-    propertyValue: 450000,
-    status: "in_progress",
-    stepsCompleted: 3,
-    totalSteps: 5,
-    createdAt: "2024-01-15",
-  },
-  {
-    id: "2",
-    clientName: "João Santos",
-    clientEmail: "joao.santos@email.com",
-    propertyAddress: "Av. Leopoldino de Oliveira, 1000 - Centro, Uberaba/MG",
-    propertyValue: 850000,
-    status: "in_progress",
-    stepsCompleted: 4,
-    totalSteps: 5,
-    createdAt: "2024-01-20",
-  },
-  {
-    id: "3",
-    clientName: "Ana Costa",
-    clientEmail: "ana.costa@email.com",
-    propertyAddress: "Rua Artur Machado, 500 - Centro, Uberaba/MG",
-    propertyValue: 320000,
-    status: "in_progress",
-    stepsCompleted: 2,
-    totalSteps: 5,
-    createdAt: "2024-01-25",
-  },
-];
-
-// Função para criar etapas iniciais baseado no número de etapas concluídas
-const createInitialSteps = (stepsCompleted: number): ProcessStep[] => {
-  const allSteps: Omit<ProcessStep, "completed">[] = [
-    {
-      id: "upload",
-      name: "Upload do Contrato",
-      description: "Contrato PDF enviado pela imobiliária",
-      icon: FileText,
-    },
-    {
-      id: "engineering",
-      name: "Engenharia do banco",
-      description: "Análise e aprovação do financiamento bancário",
-      icon: HardHat,
-    },
-    {
-      id: "signature",
-      name: "Assinatura do contrato bancário",
-      description: "Assinatura do contrato de financiamento",
-      icon: FileSignature,
-    },
-    {
-      id: "itbi",
-      name: "Recolhimento de ITBI",
-      description: "Pagamento do Imposto sobre Transmissão de Bens Imóveis",
-      icon: Receipt,
-    },
-    {
-      id: "registry",
-      name: "Entrada cartório para registro",
-      description: "Registro da escritura no cartório",
-      icon: ScrollText,
-    },
-    {
-      id: "delivery",
-      name: "Entrega de Chaves",
-      description: "Entrega das chaves e conclusão do processo",
-      icon: KeyRound,
-    },
+// Função auxiliar para calcular etapas concluídas
+const getStepsCompleted = (statusSteps: Process["status_steps"]): number => {
+  const steps = [
+    statusSteps.engineering,
+    statusSteps.signature,
+    statusSteps.itbi,
+    statusSteps.registry,
   ];
-
-  return allSteps.map((step, index) => ({
-    ...step,
-    completed: index < stepsCompleted + 1, // +1 porque upload sempre está concluído
-  }));
+  return steps.filter(Boolean).length;
 };
+
 
 export default function AdminPage() {
   const router = useRouter();
-  const [clients, setClients] = useState<Client[]>(initialClients);
+  const [processes, setProcesses] = useState<Process[]>([]);
+  const [filteredProcesses, setFilteredProcesses] = useState<Process[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
-  const [clientSteps, setClientSteps] = useState<Record<string, ProcessStep[]>>({});
+  const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
   const { toasts, showToast, removeToast } = useToast();
 
   // Form state
@@ -167,71 +106,134 @@ export default function AdminPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
-  // Inicializa etapas quando um cliente é selecionado
-  const handleOpenSheet = (clientId: string) => {
-    setSelectedClientId(clientId);
-    const client = clients.find((c) => c.id === clientId);
-    if (client && !clientSteps[clientId]) {
-      setClientSteps((prev) => ({
-        ...prev,
-        [clientId]: createInitialSteps(client.stepsCompleted),
-      }));
+  // Buscar processos do Supabase
+  useEffect(() => {
+    fetchProcesses();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Filtrar processos baseado na busca
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setFilteredProcesses(processes);
+      return;
+    }
+
+    const query = searchQuery.toLowerCase();
+    const filtered = processes.filter(
+      (process) =>
+        process.client_name.toLowerCase().includes(query) ||
+        process.client_email.toLowerCase().includes(query) ||
+        (process.property_address?.toLowerCase().includes(query) ?? false)
+    );
+    setFilteredProcesses(filtered);
+  }, [searchQuery, processes]);
+
+  const getSupabaseClient = () => {
+    if (typeof window === 'undefined') return null;
+    return createClient();
+  };
+
+  const fetchProcesses = async () => {
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+
+    try {
+      setIsLoading(true);
+      const { data, error } = await supabase
+        .from("processes")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      if (data) {
+        setProcesses(data as Process[]);
+        setFilteredProcesses(data as Process[]);
+      }
+    } catch (error) {
+      console.error("Erro ao buscar processos:", error);
+      showToast({
+        title: "Erro ao carregar processos",
+        description: "Tente recarregar a página",
+        type: "error",
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleStepToggle = (clientId: string, stepId: string) => {
-    setClientSteps((prev) => {
-      const steps = prev[clientId] || [];
-      const updatedSteps = steps.map((step) =>
-        step.id === stepId ? { ...step, completed: !step.completed } : step
-      );
-
-      // Calcula quantas etapas estão concluídas (excluindo upload e entrega de chaves)
-      const completedCount = updatedSteps.filter(
-        (step) => step.completed && step.id !== "upload" && step.id !== "delivery"
-      ).length;
-      const totalCount = updatedSteps.filter(
-        (step) => step.id !== "upload" && step.id !== "delivery"
-      ).length;
-
-      // Atualiza o cliente
-      setClients((prevClients) =>
-        prevClients.map((client) => {
-          if (client.id === clientId) {
-            const newStepsCompleted = completedCount;
-            const isCompleted = newStepsCompleted === totalCount;
-
-            // Se todas as etapas intermediárias estão concluídas, marca entrega como concluída
-            if (isCompleted && !updatedSteps.find((s) => s.id === "delivery")?.completed) {
-              updatedSteps.find((s) => s.id === "delivery")!.completed = true;
-            }
-
-            return {
-              ...client,
-              stepsCompleted: newStepsCompleted,
-              status: isCompleted ? "completed" : "in_progress",
-            };
-          }
-          return client;
-        })
-      );
-
-      // Toast de confirmação
-      const step = updatedSteps.find((s) => s.id === stepId);
-      showToast({
-        title: "Status da etapa atualizado",
-        description: `${step?.name} ${step?.completed ? "marcada como concluída" : "marcada como pendente"}`,
-        type: "success",
-      });
-
-      return {
-        ...prev,
-        [clientId]: updatedSteps,
-      };
-    });
+  const handleOpenSheet = (processId: string) => {
+    setSelectedProcessId(processId);
   };
 
-  const handleLogout = () => {
+  const handleStepToggle = async (processId: string, stepKey: keyof Process["status_steps"]) => {
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+
+    const process = processes.find((p) => p.id === processId);
+    if (!process) return;
+
+    const currentSteps = { ...process.status_steps };
+    currentSteps[stepKey] = !currentSteps[stepKey];
+
+    // Se todas as etapas intermediárias estão concluídas, marca entrega como concluída
+    const intermediateSteps = [
+      currentSteps.engineering,
+      currentSteps.signature,
+      currentSteps.itbi,
+      currentSteps.registry,
+    ];
+    const allIntermediateCompleted = intermediateSteps.every(Boolean);
+    if (allIntermediateCompleted) {
+      currentSteps.delivery = true;
+    }
+
+    // Calcula status geral
+    const stepsCompleted = getStepsCompleted(currentSteps);
+    const status = allIntermediateCompleted ? "completed" : "in_progress";
+
+    try {
+      const { error } = await supabase
+        .from("processes")
+        .update({
+          status_steps: currentSteps,
+          status,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", processId);
+
+      if (error) throw error;
+
+      // Atualiza estado local
+      setProcesses((prev) =>
+        prev.map((p) =>
+          p.id === processId
+            ? { ...p, status_steps: currentSteps, status }
+            : p
+        )
+      );
+
+      showToast({
+        title: "Status da etapa atualizado",
+        description: `Etapa ${stepKey} ${currentSteps[stepKey] ? "marcada como concluída" : "marcada como pendente"}`,
+        type: "success",
+      });
+    } catch (error) {
+      console.error("Erro ao atualizar etapa:", error);
+      showToast({
+        title: "Erro ao atualizar etapa",
+        description: "Tente novamente",
+        type: "error",
+      });
+    }
+  };
+
+  const handleLogout = async () => {
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
     router.push("/login");
   };
 
@@ -318,52 +320,105 @@ export default function AdminPage() {
       return;
     }
 
-    if (!selectedFile) {
+    setIsUploading(true);
+
+    const supabase = getSupabaseClient();
+    if (!supabase) {
       showToast({
-        title: "Contrato obrigatório",
-        description: "Por favor, faça upload do contrato PDF",
+        title: "Erro de configuração",
+        description: "Recarregue a página",
         type: "error",
       });
+      setIsUploading(false);
       return;
     }
 
-    setIsUploading(true);
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    try {
+      // Upload do arquivo para Supabase Storage (se houver)
+      let contractUrl = null;
+      let contractFilename = null;
 
-    const propertyValue = parseFloat(
-      formData.propertyValue.replace(/[^\d,]/g, "").replace(",", ".")
-    );
+      if (selectedFile) {
+        const fileExt = selectedFile.name.split(".").pop();
+        const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const filePath = `contracts/${fileName}`;
 
-    const newClient: Client = {
-      id: Date.now().toString(),
-      clientName: formData.clientName,
-      clientEmail: formData.clientEmail,
-      propertyAddress: formData.propertyAddress,
-      propertyValue: propertyValue,
-      status: "in_progress",
-      stepsCompleted: 1,
-      totalSteps: 5,
-      createdAt: new Date().toISOString().split("T")[0],
-      contractFilename: selectedFile.name,
-    };
+        const { error: uploadError } = await supabase.storage
+          .from("contracts")
+          .upload(filePath, selectedFile);
 
-    setClients((prev) => [newClient, ...prev]);
+        if (uploadError) {
+          console.error("Erro no upload:", uploadError);
+          // Continua mesmo se o upload falhar
+        } else {
+          const { data: urlData } = supabase.storage
+            .from("contracts")
+            .getPublicUrl(filePath);
+          contractUrl = urlData.publicUrl;
+          contractFilename = selectedFile.name;
+        }
+      }
 
-    setIsDialogOpen(false);
-    setFormData({
-      clientName: "",
-      clientEmail: "",
-      propertyAddress: "",
-      propertyValue: "",
-    });
-    setSelectedFile(null);
-    setIsUploading(false);
+      // Converte valor
+      const propertyValue = parseFloat(
+        formData.propertyValue.replace(/[^\d,]/g, "").replace(",", ".")
+      );
 
-    showToast({
-      title: "Contrato enviado com sucesso!",
-      description: `Processo criado para ${formData.clientName}`,
-      type: "success",
-    });
+      // Cria processo no Supabase
+      const { data, error } = await supabase
+        .from("processes")
+        .insert({
+          client_name: formData.clientName,
+          client_email: formData.clientEmail,
+          property_address: formData.propertyAddress,
+          property_value: propertyValue,
+          contract_url: contractUrl,
+          contract_filename: contractFilename,
+          status_steps: {
+            upload: true,
+            engineering: false,
+            signature: false,
+            itbi: false,
+            registry: false,
+            delivery: false,
+          },
+          status: "in_progress",
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Atualiza lista local
+      if (data) {
+        setProcesses((prev) => [data as Process, ...prev]);
+        setFilteredProcesses((prev) => [data as Process, ...prev]);
+      }
+
+      setIsDialogOpen(false);
+      setFormData({
+        clientName: "",
+        clientEmail: "",
+        propertyAddress: "",
+        propertyValue: "",
+      });
+      setSelectedFile(null);
+
+      showToast({
+        title: "Contrato enviado com sucesso!",
+        description: `Processo criado para ${formData.clientName}`,
+        type: "success",
+      });
+    } catch (error: any) {
+      console.error("Erro ao criar processo:", error);
+      showToast({
+        title: "Erro ao criar processo",
+        description: error.message || "Tente novamente",
+        type: "error",
+      });
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const getStatusBadge = (status: string, completed: number, total: number) => {
@@ -383,11 +438,6 @@ export default function AdminPage() {
       </span>
     );
   };
-
-  const selectedClient = selectedClientId
-    ? clients.find((c) => c.id === selectedClientId)
-    : null;
-  const currentSteps = selectedClientId ? clientSteps[selectedClientId] || [] : [];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-50">
@@ -421,18 +471,19 @@ export default function AdminPage() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h2 className="text-3xl font-bold text-slate-800 mb-2">Processos em Andamento</h2>
-            <p className="text-slate-600">Gerencie os processos de venda dos seus clientes</p>
-          </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-[#d4a574] hover:bg-[#c49564] text-[#302521] shadow-lg gap-2">
-                <Plus className="h-5 w-5" />
-                Novo Processo
-              </Button>
-            </DialogTrigger>
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-3xl font-bold text-slate-800 mb-2">Processos em Andamento</h2>
+              <p className="text-slate-600">Gerencie os processos de venda dos seus clientes</p>
+            </div>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-[#d4a574] hover:bg-[#c49564] text-[#302521] shadow-lg gap-2">
+                  <Plus className="h-5 w-5" />
+                  Novo Processo
+                </Button>
+              </DialogTrigger>
             <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="text-2xl">Criar Novo Processo</DialogTitle>
@@ -589,79 +640,105 @@ export default function AdminPage() {
               </form>
             </DialogContent>
           </Dialog>
+          </div>
+        </div>
+
+        {/* Barra de Busca */}
+        <div className="mb-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-400" />
+            <Input
+              type="text"
+              placeholder="Buscar por nome, email ou endereço..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 h-12 text-base border-slate-200 focus:border-[#d4a574] focus:ring-[#d4a574]"
+            />
+          </div>
         </div>
 
         {/* Cards Grid */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {clients.map((client) => (
-            <Card
-              key={client.id}
-              className="hover:shadow-lg transition-shadow duration-200 border-slate-200"
-            >
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <CardTitle className="text-lg font-semibold text-slate-800 mb-1">
-                      {client.clientName}
-                    </CardTitle>
-                    <CardDescription className="text-sm text-slate-600">
-                      {client.clientEmail}
-                    </CardDescription>
-                  </div>
-                  <FileText className="h-5 w-5 text-[#d4a574]" />
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
-                    Imóvel
-                  </p>
-                  <p className="text-sm text-slate-700 leading-relaxed">
-                    {client.propertyAddress}
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
-                    Valor
-                  </p>
-                  <p className="text-lg font-bold text-[#d4a574]">
-                    {formatCurrency(client.propertyValue)}
-                  </p>
-                </div>
-
-                {client.contractFilename && (
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
-                      Contrato
-                    </p>
-                    <p className="text-sm text-slate-600 flex items-center gap-2">
-                      <FileText className="h-4 w-4" />
-                      {client.contractFilename}
-                    </p>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                  {getStatusBadge(client.status, client.stepsCompleted, client.totalSteps)}
-                  <span className="text-xs text-slate-500">
-                    Criado em {new Date(client.createdAt).toLocaleDateString("pt-BR")}
-                  </span>
-                </div>
-
-                <Button
-                  className="w-full bg-[#d4a574] hover:bg-[#c49564] text-[#302521]"
-                  onClick={() => handleOpenSheet(client.id)}
+        {isLoading ? (
+          <div className="text-center py-12">
+            <p className="text-slate-500">Carregando processos...</p>
+          </div>
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {filteredProcesses.map((process) => {
+              const stepsCompleted = getStepsCompleted(process.status_steps);
+              const totalSteps = 4; // engineering, signature, itbi, registry
+              
+              return (
+                <Card
+                  key={process.id}
+                  className="hover:shadow-lg transition-shadow duration-200 border-slate-200"
                 >
-                  Ver Detalhes
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <CardTitle className="text-lg font-semibold text-slate-800 mb-1">
+                          {process.client_name}
+                        </CardTitle>
+                        <CardDescription className="text-sm text-slate-600">
+                          {process.client_email}
+                        </CardDescription>
+                      </div>
+                      <FileText className="h-5 w-5 text-[#d4a574]" />
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+                        Imóvel
+                      </p>
+                      <p className="text-sm text-slate-700 leading-relaxed">
+                        {process.property_address || "Não informado"}
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+                        Valor
+                      </p>
+                      <p className="text-lg font-bold text-[#d4a574]">
+                        {process.property_value ? formatCurrency(process.property_value) : "Não informado"}
+                      </p>
+                    </div>
+
+                    {process.contract_filename && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+                          Contrato
+                        </p>
+                        <p className="text-sm text-slate-600 flex items-center gap-2">
+                          <FileText className="h-4 w-4" />
+                          {process.contract_filename}
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                      {getStatusBadge(process.status, stepsCompleted, totalSteps)}
+                      <span className="text-xs text-slate-500">
+                        Criado em {new Date(process.created_at).toLocaleDateString("pt-BR")}
+                      </span>
+                    </div>
+
+                    <Button
+                      className="w-full bg-[#d4a574] hover:bg-[#c49564] text-[#302521]"
+                      onClick={() => handleOpenSheet(process.id)}
+                    >
+                      Ver Detalhes
+                    </Button>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
 
         {/* Empty State */}
-        {clients.length === 0 && (
+        {!isLoading && filteredProcesses.length === 0 && (
           <Card className="text-center py-12">
             <CardContent>
               <FileText className="h-12 w-12 text-slate-400 mx-auto mb-4" />
@@ -684,54 +761,70 @@ export default function AdminPage() {
       </main>
 
       {/* Sheet - Painel Lateral */}
-      <Sheet open={selectedClientId !== null} onOpenChange={(open) => !open && setSelectedClientId(null)}>
+      <Sheet open={selectedProcessId !== null} onOpenChange={(open) => !open && setSelectedProcessId(null)}>
         <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-          {selectedClient && (
-            <>
-              <SheetHeader>
-                <SheetTitle className="text-2xl text-slate-800">
-                  {selectedClient.clientName}
-                </SheetTitle>
-                <SheetDescription className="text-base text-slate-600">
-                  {selectedClient.propertyAddress}
-                </SheetDescription>
-              </SheetHeader>
+          {selectedProcessId && (() => {
+            const selectedProcess = processes.find((p) => p.id === selectedProcessId);
+            if (!selectedProcess) return null;
 
-              <div className="mt-6 space-y-6">
-                {/* Barra de Progresso */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-slate-700">Progresso Geral</span>
-                    <span className="text-sm font-semibold text-[#d4a574]">
-                      {selectedClient.stepsCompleted}/{selectedClient.totalSteps} etapas
-                    </span>
-                  </div>
-                  <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
-                    <div
-                      className="bg-[#d4a574] h-full rounded-full transition-all duration-500"
-                      style={{
-                        width: `${(selectedClient.stepsCompleted / selectedClient.totalSteps) * 100}%`,
-                      }}
-                    />
-                  </div>
-                </div>
+            const stepsCompleted = getStepsCompleted(selectedProcess.status_steps);
+            const totalSteps = 4;
 
-                {/* Checklist de Etapas */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-slate-800">Etapas do Processo</h3>
-                  <div className="space-y-3">
-                    {currentSteps.length > 0 ? (
-                      currentSteps.map((step) => {
-                        const Icon = step.icon;
-                        const isDisabled = step.id === "upload"; // Upload sempre concluído
+            const stepsConfig = [
+              { key: "upload" as const, name: "Upload do Contrato", description: "Contrato PDF enviado pela imobiliária", icon: FileText },
+              { key: "engineering" as const, name: "Engenharia do banco", description: "Análise e aprovação do financiamento bancário", icon: HardHat },
+              { key: "signature" as const, name: "Assinatura do contrato bancário", description: "Assinatura do contrato de financiamento", icon: FileSignature },
+              { key: "itbi" as const, name: "Recolhimento de ITBI", description: "Pagamento do Imposto sobre Transmissão de Bens Imóveis", icon: Receipt },
+              { key: "registry" as const, name: "Entrada cartório para registro", description: "Registro da escritura no cartório", icon: ScrollText },
+              { key: "delivery" as const, name: "Entrega de Chaves", description: "Entrega das chaves e conclusão do processo", icon: KeyRound },
+            ];
+
+            return (
+              <>
+                <SheetHeader>
+                  <SheetTitle className="text-2xl text-slate-800">
+                    {selectedProcess.client_name}
+                  </SheetTitle>
+                  <SheetDescription className="text-base text-slate-600">
+                    {selectedProcess.property_address || "Endereço não informado"}
+                  </SheetDescription>
+                </SheetHeader>
+
+                <div className="mt-6 space-y-6">
+                  {/* Barra de Progresso */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-slate-700">Progresso Geral</span>
+                      <span className="text-sm font-semibold text-[#d4a574]">
+                        {stepsCompleted}/{totalSteps} etapas
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+                      <div
+                        className="bg-[#d4a574] h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${(stepsCompleted / totalSteps) * 100}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Checklist de Etapas */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-slate-800">Etapas do Processo</h3>
+                    <div className="space-y-3">
+                      {stepsConfig.map((stepConfig) => {
+                        const Icon = stepConfig.icon;
+                        const isCompleted = selectedProcess.status_steps[stepConfig.key];
+                        const isDisabled = stepConfig.key === "upload"; // Upload sempre concluído
 
                         return (
                           <div
-                            key={step.id}
+                            key={stepConfig.key}
                             className={`
                               flex items-center justify-between p-4 rounded-lg border transition-all
                               ${
-                                step.completed
+                                isCompleted
                                   ? "bg-amber-50 border-[#d4a574]"
                                   : "bg-slate-50 border-slate-200"
                               }
@@ -742,7 +835,7 @@ export default function AdminPage() {
                                 className={`
                                   p-2 rounded-lg
                                   ${
-                                    step.completed
+                                    isCompleted
                                       ? "bg-[#d4a574] text-[#302521]"
                                       : "bg-slate-200 text-slate-400"
                                   }
@@ -754,39 +847,35 @@ export default function AdminPage() {
                                 <p
                                   className={`
                                     font-medium
-                                    ${step.completed ? "text-[#302521]" : "text-slate-700"}
+                                    ${isCompleted ? "text-[#302521]" : "text-slate-700"}
                                   `}
                                 >
-                                  {step.name}
+                                  {stepConfig.name}
                                 </p>
                                 <p
                                   className={`
                                     text-sm
-                                    ${step.completed ? "text-[#302521]" : "text-slate-500"}
+                                    ${isCompleted ? "text-[#302521]" : "text-slate-500"}
                                   `}
                                 >
-                                  {step.description}
+                                  {stepConfig.description}
                                 </p>
                               </div>
                             </div>
                             <Switch
-                              checked={step.completed}
-                              onCheckedChange={() => !isDisabled && handleStepToggle(selectedClient.id, step.id)}
+                              checked={isCompleted}
+                              onCheckedChange={() => !isDisabled && handleStepToggle(selectedProcess.id, stepConfig.key)}
                               disabled={isDisabled}
                             />
                           </div>
                         );
-                      })
-                    ) : (
-                      <div className="text-center py-8 text-slate-500">
-                        Carregando etapas...
-                      </div>
-                    )}
+                      })}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </>
-          )}
+              </>
+            );
+          })()}
         </SheetContent>
       </Sheet>
     </div>
