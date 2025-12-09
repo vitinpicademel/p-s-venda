@@ -7,13 +7,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Home, AlertCircle } from "lucide-react";
+import { Home, AlertCircle, ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ToastContainer, useToast } from "@/components/ui/toast";
 
-export default function LoginPage() {
+export default function SignUpPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
@@ -29,103 +30,60 @@ export default function LoginPage() {
     }
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setIsLoading(true);
 
-    console.log("🔵 [LOGIN] Iniciando login...");
-
     const supabase = getSupabaseClient();
     if (!supabase) {
-      const errorMsg = "⚠️ Supabase não configurado! Abra o arquivo .env.local e substitua os valores placeholder pelos valores reais do seu projeto Supabase (Settings → API). Depois REINICIE o servidor (Ctrl+C e npm run dev). Veja o arquivo COMO_CONFIGURAR_ENV.md para instruções detalhadas.";
-      setError(errorMsg);
-      showToast({
-        title: "Erro de Configuração",
-        description: errorMsg,
-        type: "error",
-      });
+      setError("⚠️ Supabase não configurado! Abra o arquivo .env.local e substitua os valores placeholder pelos valores reais do seu projeto Supabase (Settings → API). Depois REINICIE o servidor (Ctrl+C e npm run dev). Veja o arquivo COMO_CONFIGURAR_ENV.md para instruções detalhadas.");
       setIsLoading(false);
       return;
     }
 
     try {
-      console.log("🔵 [LOGIN] Chamando signInWithPassword...");
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+      const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            full_name: fullName,
+            role: 'client',
+          },
+        },
       });
 
-      console.log("🔵 [LOGIN] Supabase respondeu:", { 
-        hasData: !!data, 
-        hasUser: !!data?.user, 
-        hasSession: !!data?.session,
-        error: signInError 
-      });
-
-      // Tratamento de Erro: Se der erro, mostra toast/alerta e para o loading
-      if (signInError) {
-        console.error("🔴 [LOGIN] Erro de autenticação:", signInError);
-        let errorMessage = signInError.message || "Email ou senha incorretos";
-        
-        // Tratamento específico para email não confirmado
-        if (signInError.message?.includes('not confirmed') || signInError.message?.includes('Email not confirmed')) {
-          errorMessage = "Email não confirmado. Verifique sua caixa de entrada e clique no link de confirmação, ou desabilite a confirmação de email no Supabase (Authentication → Settings → Disable email confirmations).";
-        }
-
-        setError(errorMessage);
-        showToast({
-          title: "Erro de Login",
-          description: errorMessage,
-          type: "error",
-        });
+      if (signUpError) {
+        setError(signUpError.message || "Erro ao criar conta. Verifique suas credenciais.");
         setIsLoading(false);
         return;
       }
 
-      // Tratamento de Sucesso: Se não houver erro, redireciona IMEDIATAMENTE
       if (data.user) {
-        console.log("🟢 [LOGIN] Autenticação bem-sucedida!");
-        console.log("🟢 [LOGIN] Sessão encontrada?", !!data.session);
-        console.log("🟢 [LOGIN] User ID:", data.user.id);
-        console.log("🟢 [LOGIN] User Email:", data.user.email);
-
-        // Limpa cache do Next.js
-        router.refresh();
-
-        // Verificação simples de email para redirecionamento
-        const emailLower = email.toLowerCase();
-        const redirectPath = emailLower.includes('admin') || emailLower.includes('donna') ? '/admin' : '/cliente';
-        
-        console.log("🟢 [LOGIN] Tentando redirecionar para:", redirectPath);
-
-        // Tenta usar router.push primeiro
-        try {
-          router.push(redirectPath);
-          console.log("🟢 [LOGIN] router.push executado");
-        } catch (pushError) {
-          console.error("🔴 [LOGIN] Erro no router.push, usando window.location.href:", pushError);
-          // Fallback: força navegação com window.location.href
-          window.location.href = redirectPath;
+        // Verifica se o email precisa ser confirmado
+        if (data.user.email_confirmed_at === null) {
+          showToast({
+            title: "Conta criada!",
+            description: "Verifique seu email para confirmar a conta. Ou desabilite a confirmação no Supabase (Authentication → Settings).",
+            type: "warning",
+          });
+        } else {
+          showToast({
+            title: "Conta criada com sucesso!",
+            description: "Redirecionando para login...",
+            type: "success",
+          });
         }
 
-        // NÃO seta isLoading como false aqui - deixa como true durante o redirecionamento
-        // Isso evita que o usuário clique de novo enquanto a página carrega
-        return;
-      } else {
-        console.warn("🟡 [LOGIN] Autenticação retornou sem user");
-        setError("Erro inesperado. Tente novamente.");
-        setIsLoading(false);
+        // Aguarda um pouco e redireciona para login
+        setTimeout(() => {
+          router.push("/login");
+        }, 2000);
       }
     } catch (err: any) {
-      console.error("🔴 [LOGIN] Erro ao fazer login:", err);
-      const errorMessage = err?.message || "Erro ao fazer login. Verifique se o Supabase está configurado corretamente.";
-      setError(errorMessage);
-      showToast({
-        title: "Erro",
-        description: errorMessage,
-        type: "error",
-      });
+      console.error("Erro ao criar conta:", err);
+      setError(err?.message || "Erro ao criar conta. Verifique se o Supabase está configurado corretamente.");
       setIsLoading(false);
     }
   };
@@ -152,11 +110,27 @@ export default function LoginPage() {
             Donna Negociações Imobiliárias
           </CardTitle>
           <CardDescription className="text-base text-slate-600">
-            Sistema de Acompanhamento Pós-Venda
+            Crie sua conta para acompanhar seu processo
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleSignUp} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="fullName" className="text-slate-700 font-medium">
+                Nome Completo
+              </Label>
+              <Input
+                id="fullName"
+                type="text"
+                placeholder="Seu nome completo"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                className="h-11 border-slate-200 focus:border-[#d4a574] focus:ring-[#d4a574]"
+                required
+                disabled={isLoading}
+              />
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="email" className="text-slate-700 font-medium">
                 Email
@@ -171,6 +145,9 @@ export default function LoginPage() {
                 required
                 disabled={isLoading}
               />
+              <p className="text-xs text-slate-500">
+                Use o mesmo email informado pela imobiliária
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -180,11 +157,12 @@ export default function LoginPage() {
               <Input
                 id="password"
                 type="password"
-                placeholder="Sua senha"
+                placeholder="Mínimo 6 caracteres"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="h-11 border-slate-200 focus:border-[#d4a574] focus:ring-[#d4a574]"
                 required
+                minLength={6}
                 disabled={isLoading}
               />
             </div>
@@ -201,16 +179,26 @@ export default function LoginPage() {
               className="w-full h-11 bg-[#d4a574] hover:bg-[#c49564] text-[#302521] font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
               disabled={isLoading}
             >
-              {isLoading ? "Entrando..." : "Entrar"}
+              {isLoading ? "Criando conta..." : "Criar Conta"}
             </Button>
 
             <div className="pt-4 border-t border-slate-200">
               <p className="text-xs text-center text-slate-500">
-                Não tem uma conta?{" "}
-                <Link href="/signup" className="text-[#d4a574] hover:underline font-medium">
-                  Criar conta
+                Já tem uma conta?{" "}
+                <Link href="/login" className="text-[#d4a574] hover:underline font-medium">
+                  Fazer login
                 </Link>
               </p>
+            </div>
+
+            <div className="pt-2">
+              <Link
+                href="/login"
+                className="flex items-center justify-center gap-2 text-sm text-slate-600 hover:text-[#302521] transition-colors"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Voltar para login
+              </Link>
             </div>
           </form>
         </CardContent>
@@ -244,3 +232,4 @@ export default function LoginPage() {
     </div>
   );
 }
+
