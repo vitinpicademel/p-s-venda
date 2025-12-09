@@ -38,7 +38,11 @@ export default function LoginPage() {
 
     const supabase = getSupabaseClient();
     if (!supabase) {
-      const errorMsg = "⚠️ Supabase não configurado! Abra o arquivo .env.local e substitua os valores placeholder pelos valores reais do seu projeto Supabase (Settings → API). Depois REINICIE o servidor (Ctrl+C e npm run dev). Veja o arquivo COMO_CONFIGURAR_ENV.md para instruções detalhadas.";
+      // Detecta se está rodando na Vercel ou localmente
+      const isVercel = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app');
+      const errorMsg = isVercel
+        ? "⚠️ Supabase não configurado na Vercel! Configure as variáveis de ambiente NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY no painel da Vercel (Settings → Environment Variables). Veja o arquivo CONFIGURAR_VERCEL.md para instruções detalhadas."
+        : "⚠️ Supabase não configurado! Configure o arquivo .env.local com os valores reais do seu projeto Supabase (Settings → API). Depois REINICIE o servidor (Ctrl+C e npm run dev). Veja o arquivo COMO_CONFIGURAR_ENV.md para instruções detalhadas.";
       setError(errorMsg);
       showToast({
         title: "Erro de Configuração",
