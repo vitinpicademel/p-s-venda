@@ -27,12 +27,6 @@ export default function ProcessDocumentsList({
 
   const supabase = createClient();
 
-  useEffect(() => {
-    if (supabase) {
-      fetchDocuments();
-    }
-  }, [processId, supabase]);
-
   const fetchDocuments = async () => {
     if (!supabase) return;
 
@@ -99,6 +93,12 @@ export default function ProcessDocumentsList({
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (supabase) {
+      fetchDocuments();
+    }
+  }, [processId, supabase]);
 
   const handleOpenForm = (personType: "comprador" | "vendedor") => {
     setSelectedPersonType(personType);

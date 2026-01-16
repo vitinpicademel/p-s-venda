@@ -1031,7 +1031,7 @@ export default function AdminPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => downloadContract(process.contract_url!, process.contract_filename)}
+                            onClick={() => process.contract_url && downloadContract(process.contract_url, process.contract_filename)}
                             className="gap-2 flex-shrink-0"
                           >
                             <Download className="h-3 w-3" />
