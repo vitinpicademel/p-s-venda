@@ -1268,8 +1268,8 @@ export default function AdminPage() {
                     </div>
                   </div>
 
-                  {/* Documentos de Comprador e Vendedor */}
-                  <div className="space-y-4 pt-6 border-t border-slate-200">
+                  {/* Documentos */}
+                  <div className="mt-6 space-y-4 max-h-[60vh] overflow-y-auto pr-2">
                     <div className="flex items-center gap-2">
                       <FolderOpen className="h-5 w-5 text-[#d4a574]" />
                       <h3 className="text-lg font-semibold text-slate-800">Documentos</h3>
