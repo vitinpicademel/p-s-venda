@@ -98,7 +98,7 @@ export default function ProcessDocumentsList({
     if (supabase) {
       fetchDocuments();
     }
-  }, [processId, supabase]);
+  }, [processId, supabase, fetchDocuments]);
 
   const handleOpenForm = (personType: "comprador" | "vendedor") => {
     setSelectedPersonType(personType);
