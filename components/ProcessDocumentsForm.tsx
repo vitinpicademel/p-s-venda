@@ -71,10 +71,10 @@ export default function ProcessDocumentsForm({
         return;
       }
 
-      if (file.size > 10 * 1024 * 1024) {
+      if (file.size > 50 * 1024 * 1024) {
         showToast({
           title: "Arquivo muito grande",
-          description: "O arquivo deve ter no máximo 10MB",
+          description: "O arquivo deve ter no máximo 50MB",
           type: "error",
         });
         return;
@@ -99,10 +99,10 @@ export default function ProcessDocumentsForm({
 
     const file = e.dataTransfer.files[0];
     if (file && file.type === "application/pdf") {
-      if (file.size > 10 * 1024 * 1024) {
+      if (file.size > 50 * 1024 * 1024) {
         showToast({
           title: "Arquivo muito grande",
-          description: "O arquivo deve ter no máximo 10MB",
+          description: "O arquivo deve ter no máximo 50MB",
           type: "error",
         });
         return;
@@ -457,7 +457,7 @@ export default function ProcessDocumentsForm({
                     Clique ou arraste o arquivo PDF aqui
                   </p>
                   <p className="text-xs text-slate-500">
-                    Apenas arquivos PDF são aceitos (máximo 10MB)
+                    Apenas arquivos PDF são aceitos (máximo 50MB)
                   </p>
                   <p className="text-xs text-slate-400 mt-2">
                     Inclua toda a documentação digitalizada (CPF, RG, Certidões, etc.)
