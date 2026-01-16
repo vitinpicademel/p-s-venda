@@ -753,7 +753,7 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-50">
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-50 overflow-hidden">
       {/* Toast Container */}
       <ToastContainer toasts={toasts} onRemove={removeToast} />
 
@@ -1086,7 +1086,7 @@ export default function AdminPage() {
 
       {/* Sheet - Painel Lateral */}
       <Sheet open={selectedProcessId !== null} onOpenChange={(open) => !open && setSelectedProcessId(null)}>
-        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetContent className="w-full sm:max-w-lg">
           {selectedProcessId && (() => {
             const selectedProcess = processes.find((p) => p.id === selectedProcessId);
             if (!selectedProcess) return null;
