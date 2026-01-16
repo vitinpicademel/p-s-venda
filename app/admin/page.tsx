@@ -42,6 +42,7 @@ import {
   Pencil,
   Save,
   XCircle,
+  Download,
   FolderOpen,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -182,6 +183,69 @@ export default function AdminPage() {
       setEditFormData({
         client_name: process.client_name,
         property_address: process.property_address || "",
+      });
+    }
+  };
+
+  const downloadContract = async (contractUrl: string, contractFilename: string) => {
+    if (!contractUrl || !contractFilename) {
+      showToast({
+        title: "Contrato não disponível",
+        description: "O contrato não foi encontrado.",
+        type: "error",
+      });
+      return;
+    }
+
+    try {
+      const supabase = createClient();
+      if (!supabase) {
+        showToast({
+          title: "Erro de conexão",
+          description: "Não foi possível conectar ao sistema.",
+          type: "error",
+        });
+        return;
+      }
+
+      // Extrair o path do URL público (formato: https://[project].supabase.co/storage/v1/object/public/contracts/[path])
+      const urlParts = contractUrl.split('/contracts/');
+      if (urlParts.length < 2) {
+        showToast({
+          title: "Erro no formato do arquivo",
+          description: "Não foi possível identificar o caminho do contrato.",
+          type: "error",
+        });
+        return;
+      }
+
+      const filePath = urlParts[1];
+
+      // Baixa o arquivo como 'blob' do Supabase
+      const { data, error } = await supabase.storage
+        .from('contracts')
+        .download(filePath);
+
+      if (error) throw error;
+
+      // Cria um link temporário para forçar o download no navegador
+      const url = window.URL.createObjectURL(data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', contractFilename);
+      document.body.appendChild(link);
+      link.click();
+
+      // Limpa o link e o objeto da memória
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+    } catch (err: any) {
+      console.error('Erro no download do contrato:', err);
+      showToast({
+        title: "Erro no download",
+        description: "Não foi possível baixar o contrato. Tente novamente.",
+        type: "error",
       });
     }
   };
@@ -959,10 +1023,21 @@ export default function AdminPage() {
                         <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
                           Contrato
                         </p>
-                        <p className="text-sm text-slate-600 flex items-center gap-2">
-                          <FileText className="h-4 w-4" />
-                          {process.contract_filename}
-                        </p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm text-slate-600 flex items-center gap-2">
+                            <FileText className="h-4 w-4" />
+                            {process.contract_filename}
+                          </p>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => downloadContract(process.contract_url!, process.contract_filename)}
+                            className="gap-2 flex-shrink-0"
+                          >
+                            <Download className="h-3 w-3" />
+                            Baixar
+                          </Button>
+                        </div>
                       </div>
                     )}
 
