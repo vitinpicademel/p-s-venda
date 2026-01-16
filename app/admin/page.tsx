@@ -187,7 +187,7 @@ export default function AdminPage() {
     }
   };
 
-  const downloadContract = async (contractUrl: string, contractFilename: string) => {
+  const downloadContract = async (contractUrl: string | null, contractFilename: string | null) => {
     if (!contractUrl || !contractFilename) {
       showToast({
         title: "Contrato não disponível",
