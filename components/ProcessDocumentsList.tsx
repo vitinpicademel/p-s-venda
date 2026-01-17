@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { User, Building2, FileText, Download, CheckCircle2, Clock, Plus } from "lucide-react";
+import { User, Building2, FileText, Download, CheckCircle2, Clock, Plus, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { ProcessDocument } from "@/types/documents";
 import ProcessDocumentsForm from "./ProcessDocumentsForm";
@@ -24,6 +24,7 @@ export default function ProcessDocumentsList({
   const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedPersonType, setSelectedPersonType] = useState<"comprador" | "vendedor" | null>(null);
+  const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null);
 
   const supabase = useMemo(() => createClient(), []);
 
@@ -113,6 +114,47 @@ export default function ProcessDocumentsList({
   const handleSuccess = () => {
     fetchDocuments();
   };
+
+  const handleDeleteDocument = useCallback(
+    async (doc: ProcessDocument) => {
+      const docs = doc.documents as any;
+      const filePath = docs.file_path;
+
+      if (!filePath) {
+        alert("Erro: caminho do arquivo não encontrado.");
+        return;
+      }
+
+      const confirmed = window.confirm("Tem certeza que deseja excluir?");
+      if (!confirmed) return;
+
+      try {
+        setDeletingDocumentId(doc.id);
+
+        const { error: storageError } = await supabase.storage
+          .from(PROCESS_DOCS_BUCKET)
+          .remove([filePath]);
+
+        if (storageError) throw storageError;
+
+        const { error: dbError } = await supabase
+          .from("process_documents")
+          .delete()
+          .eq("id", doc.id);
+
+        if (dbError) throw dbError;
+
+        setDocuments((prev: ProcessDocument[]) => prev.filter((d: ProcessDocument) => d.id !== doc.id));
+        alert("Documento removido!");
+      } catch (error) {
+        console.error("Erro ao excluir documento:", error);
+        alert("Erro ao excluir documento.");
+      } finally {
+        setDeletingDocumentId(null);
+      }
+    },
+    [supabase]
+  );
 
   const getDocumentStatus = (doc: ProcessDocument) => {
     const docs = doc.documents as any;
@@ -232,7 +274,11 @@ export default function ProcessDocumentsList({
                       </span>
                     </div>
 
-                    <DocumentDetails doc={compradorDoc} />
+                    <DocumentDetails
+                      doc={compradorDoc}
+                      onDelete={handleDeleteDocument}
+                      isDeleting={deletingDocumentId === compradorDoc.id}
+                    />
                   </div>
                 );
               })()
@@ -308,7 +354,11 @@ export default function ProcessDocumentsList({
                       </span>
                     </div>
 
-                    <DocumentDetails doc={vendedorDoc} />
+                    <DocumentDetails
+                      doc={vendedorDoc}
+                      onDelete={handleDeleteDocument}
+                      isDeleting={deletingDocumentId === vendedorDoc.id}
+                    />
                   </div>
                 );
               })()
@@ -336,7 +386,15 @@ export default function ProcessDocumentsList({
   );
 }
 
-function DocumentDetails({ doc }: { doc: ProcessDocument }) {
+function DocumentDetails({
+  doc,
+  onDelete,
+  isDeleting,
+}: {
+  doc: ProcessDocument;
+  onDelete: (doc: ProcessDocument) => void;
+  isDeleting: boolean;
+}) {
   const documents = doc.documents as any;
   const documentacaoFilename = documents.documentacao_completa_filename || "Documentação Completa.pdf";
   const bucket = documents.bucket || PROCESS_DOCS_BUCKET;
@@ -412,15 +470,26 @@ function DocumentDetails({ doc }: { doc: ProcessDocument }) {
             )}
           </div>
         </div>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={handleDownload}
-          className="gap-2"
-        >
-          <Download className="h-3 w-3" />
-          Baixar PDF
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleDownload}
+            className="gap-2"
+          >
+            <Download className="h-3 w-3" />
+            Baixar PDF
+          </Button>
+          <Button
+            size="icon"
+            variant="outline"
+            onClick={() => onDelete(doc)}
+            disabled={isDeleting}
+            className="text-red-600 hover:text-red-700"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
     </div>
   );
