@@ -1,7 +1,7 @@
 "use client";
 
 // Commit de teste: funcionalidade de download direto implementada
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { User, Building2, FileText, Download, CheckCircle2, Clock, Plus } from "lucide-react";
@@ -25,9 +25,9 @@ export default function ProcessDocumentsList({
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedPersonType, setSelectedPersonType] = useState<"comprador" | "vendedor" | null>(null);
 
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
-  const fetchDocuments = async () => {
+  const fetchDocuments = useCallback(async () => {
     if (!supabase) return;
 
     try {
@@ -92,13 +92,13 @@ export default function ProcessDocumentsList({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [processId, supabase]);
 
   useEffect(() => {
     if (supabase) {
       fetchDocuments();
     }
-  }, [processId, supabase, fetchDocuments]);
+  }, [fetchDocuments, supabase]);
 
   const handleOpenForm = (personType: "comprador" | "vendedor") => {
     setSelectedPersonType(personType);

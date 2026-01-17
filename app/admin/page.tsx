@@ -1086,7 +1086,7 @@ export default function AdminPage() {
 
       {/* Sheet - Painel Lateral */}
       <Sheet open={selectedProcessId !== null} onOpenChange={(open) => !open && setSelectedProcessId(null)}>
-        <SheetContent className="w-full sm:max-w-lg">
+        <SheetContent className="w-full sm:max-w-lg flex flex-col h-full max-h-screen min-h-0 overflow-hidden">
           {selectedProcessId && (() => {
             const selectedProcess = processes.find((p) => p.id === selectedProcessId);
             if (!selectedProcess) return null;
@@ -1105,7 +1105,7 @@ export default function AdminPage() {
 
             return (
               <>
-                <SheetHeader>
+                <SheetHeader className="flex-none">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       {isEditingProcess ? (
@@ -1185,7 +1185,7 @@ export default function AdminPage() {
                   </div>
                 </SheetHeader>
 
-                <div className="mt-6 space-y-6">
+                <div className="flex-1 min-h-0 overflow-y-auto mt-6 space-y-6 pr-2">
                   {/* Barra de Progresso */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
@@ -1269,7 +1269,7 @@ export default function AdminPage() {
                   </div>
 
                   {/* Documentos */}
-                  <div className="mt-6 space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+                  <div className="mt-6 space-y-4">
                     <div className="flex items-center gap-2">
                       <FolderOpen className="h-5 w-5 text-[#d4a574]" />
                       <h3 className="text-lg font-semibold text-slate-800">Documentos</h3>
