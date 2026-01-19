@@ -14,11 +14,13 @@ const PROCESS_DOCS_BUCKET = "arquivos";
 interface ProcessDocumentsListProps {
   processId: string;
   processClientName: string;
+  isReadOnly?: boolean;
 }
 
 export default function ProcessDocumentsList({
   processId,
   processClientName,
+  isReadOnly = false,
 }: ProcessDocumentsListProps) {
   const [documents, setDocuments] = useState<ProcessDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -218,7 +220,7 @@ export default function ProcessDocumentsList({
                 <User className="h-5 w-5 text-[#d4a574]" />
                 <CardTitle className="text-lg">Documentos do Comprador</CardTitle>
               </div>
-              {!hasComprador && (
+              {!isReadOnly && !hasComprador && (
                 <Button
                   size="sm"
                   className="bg-[#d4a574] hover:bg-[#c49564] text-[#302521] gap-2"
@@ -278,6 +280,7 @@ export default function ProcessDocumentsList({
                       doc={compradorDoc}
                       onDelete={handleDeleteDocument}
                       isDeleting={deletingDocumentId === compradorDoc.id}
+                      isReadOnly={isReadOnly}
                     />
                   </div>
                 );
@@ -298,7 +301,7 @@ export default function ProcessDocumentsList({
                 <Building2 className="h-5 w-5 text-[#d4a574]" />
                 <CardTitle className="text-lg">Documentos do Vendedor</CardTitle>
               </div>
-              {!hasVendedor && (
+              {!isReadOnly && !hasVendedor && (
                 <Button
                   size="sm"
                   className="bg-[#d4a574] hover:bg-[#c49564] text-[#302521] gap-2"
@@ -358,6 +361,7 @@ export default function ProcessDocumentsList({
                       doc={vendedorDoc}
                       onDelete={handleDeleteDocument}
                       isDeleting={deletingDocumentId === vendedorDoc.id}
+                      isReadOnly={isReadOnly}
                     />
                   </div>
                 );
@@ -390,10 +394,12 @@ function DocumentDetails({
   doc,
   onDelete,
   isDeleting,
+  isReadOnly,
 }: {
   doc: ProcessDocument;
   onDelete: (doc: ProcessDocument) => void;
   isDeleting: boolean;
+  isReadOnly: boolean;
 }) {
   const documents = doc.documents as any;
   const documentacaoFilename = documents.documentacao_completa_filename || "Documentação Completa.pdf";
@@ -480,15 +486,17 @@ function DocumentDetails({
             <Download className="h-3 w-3" />
             Baixar PDF
           </Button>
-          <Button
-            size="icon"
-            variant="outline"
-            onClick={() => onDelete(doc)}
-            disabled={isDeleting}
-            className="text-red-600 hover:text-red-700"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          {!isReadOnly && (
+            <Button
+              size="icon"
+              variant="outline"
+              onClick={() => onDelete(doc)}
+              disabled={isDeleting}
+              className="text-red-600 hover:text-red-700"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
     </div>

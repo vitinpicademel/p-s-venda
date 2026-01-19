@@ -39,6 +39,7 @@ import {
   KeyRound,
   Search,
   Pencil,
+  Eye,
   Save,
   XCircle,
   Download,
@@ -106,6 +107,7 @@ export default function AdminPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
+  const [isReadOnlyView, setIsReadOnlyView] = useState(false);
   const [isEditingProcess, setIsEditingProcess] = useState(false);
   const [editFormData, setEditFormData] = useState({
     client_name: "",
@@ -199,9 +201,10 @@ export default function AdminPage() {
     }
   };
 
-  const handleOpenSheet = (processId: string) => {
+  const handleOpenSheet = (processId: string, readOnly: boolean = false) => {
     setSelectedProcessId(processId);
     setIsEditingProcess(false);
+    setIsReadOnlyView(readOnly);
     // Inicializa os dados de edição com os valores atuais
     const process = processes.find((p) => p.id === processId);
     if (process) {
@@ -276,6 +279,7 @@ export default function AdminPage() {
   };
 
   const handleStartEdit = () => {
+    if (isReadOnlyView) return;
     setIsEditingProcess(true);
   };
 
@@ -1077,12 +1081,23 @@ export default function AdminPage() {
                       </span>
                     </div>
 
-                    <Button
-                      className="w-full bg-[#d4a574] hover:bg-[#c49564] text-[#302521]"
-                      onClick={() => handleOpenSheet(process.id)}
-                    >
-                      Ver Detalhes
-                    </Button>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        className="w-full bg-[#d4a574] hover:bg-[#c49564] text-[#302521] gap-2"
+                        onClick={() => handleOpenSheet(process.id, false)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                        Editar Processo
+                      </Button>
+                      <Button
+                        className="w-full gap-2"
+                        variant="outline"
+                        onClick={() => handleOpenSheet(process.id, true)}
+                      >
+                        <Eye className="h-4 w-4" />
+                        Ver Status
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               );
@@ -1114,7 +1129,16 @@ export default function AdminPage() {
       </main>
 
       {/* Sheet - Painel Lateral */}
-      <Sheet open={selectedProcessId !== null} onOpenChange={(open) => !open && setSelectedProcessId(null)}>
+      <Sheet
+        open={selectedProcessId !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedProcessId(null);
+            setIsReadOnlyView(false);
+            setIsEditingProcess(false);
+          }
+        }}
+      >
         <SheetContent className="w-full sm:max-w-lg flex flex-col h-full max-h-screen min-h-0 overflow-hidden">
           {selectedProcessId && (() => {
             const selectedProcess = processes.find((p) => p.id === selectedProcessId);
@@ -1197,15 +1221,24 @@ export default function AdminPage() {
                         <>
                           <SheetTitle className="text-2xl text-slate-800 flex items-center justify-between">
                             <span>{selectedProcess.client_name}</span>
-                            <Button
-                              onClick={handleStartEdit}
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-[#d4a574] hover:text-[#c49564] hover:bg-amber-50"
-                              title="Editar nome e endereço"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
+                            <div className="flex items-center gap-2">
+                              {isReadOnlyView && (
+                                <span className="px-2 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
+                                  Modo Visualização
+                                </span>
+                              )}
+                              {!isReadOnlyView && (
+                                <Button
+                                  onClick={handleStartEdit}
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-[#d4a574] hover:text-[#c49564] hover:bg-amber-50"
+                                  title="Editar nome e endereço"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
                           </SheetTitle>
                           <SheetDescription className="text-base text-slate-600">
                             {selectedProcess.property_address || "Endereço não informado"}
@@ -1242,7 +1275,7 @@ export default function AdminPage() {
                       {stepsConfig.map((stepConfig) => {
                         const Icon = stepConfig.icon;
                         const isCompleted = selectedProcess.status_steps[stepConfig.key];
-                        const isDisabled = stepConfig.key === "upload"; // Upload sempre concluído
+                        const isDisabled = stepConfig.key === "upload" || isReadOnlyView;
 
                         return (
                           <div
@@ -1308,6 +1341,7 @@ export default function AdminPage() {
                     <ProcessDocumentsList
                       processId={selectedProcess.id}
                       processClientName={selectedProcess.client_name}
+                      isReadOnly={isReadOnlyView}
                     />
                   </div>
                 </div>
