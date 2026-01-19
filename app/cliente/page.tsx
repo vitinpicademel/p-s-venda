@@ -9,6 +9,8 @@ import {
   FileText,
   Building2,
   FileCheck,
+  ClipboardList,
+  Barcode,
   Receipt,
   ScrollText,
   Home,
@@ -29,7 +31,9 @@ type Process = {
   contract_filename: string | null;
   status_steps: {
     upload: boolean;
-    engineering: boolean;
+    solicitacao_engenharia: boolean;
+    envio_boleto_cliente: boolean;
+    laudo: boolean;
     signature: boolean;
     itbi: boolean;
     registry: boolean;
@@ -42,6 +46,9 @@ type Process = {
 const getStepIcon = (stepName: string) => {
   const name = stepName.toLowerCase();
   if (name.includes("contrato")) return FileText;
+  if (name.includes("solicita")) return ClipboardList;
+  if (name.includes("boleto")) return Barcode;
+  if (name.includes("laudo")) return FileCheck;
   if (name.includes("engenharia") || name.includes("banco")) return Building2;
   if (name.includes("assinatura")) return FileCheck;
   if (name.includes("itbi")) return Receipt;
@@ -90,7 +97,23 @@ export default function ClientePage() {
       if (error) throw error;
 
       if (data) {
-        setProcess(data as Process);
+        const steps = (data as any).status_steps || {};
+        const legacyEngineering = !!steps.engineering;
+        const normalized: Process = {
+          ...(data as any),
+          status_steps: {
+            upload: !!steps.upload,
+            solicitacao_engenharia: steps.solicitacao_engenharia ?? legacyEngineering,
+            envio_boleto_cliente: steps.envio_boleto_cliente ?? legacyEngineering,
+            laudo: steps.laudo ?? legacyEngineering,
+            signature: !!steps.signature,
+            itbi: !!steps.itbi,
+            registry: !!steps.registry,
+            delivery: !!steps.delivery,
+          },
+        };
+
+        setProcess(normalized);
       }
     } catch (error) {
       console.error("Erro ao buscar processo:", error);
@@ -194,7 +217,9 @@ export default function ClientePage() {
 
   const stepsConfig = [
     { key: "upload" as const, name: "Upload do Contrato", description: "Contrato PDF enviado pela imobiliária", icon: FileText },
-    { key: "engineering" as const, name: "Engenharia do banco", description: "Análise e aprovação do financiamento bancário", icon: Building2 },
+    { key: "solicitacao_engenharia" as const, name: "Solicitação Engenharia", description: "Solicitação de vistoria enviada ao banco", icon: ClipboardList },
+    { key: "envio_boleto_cliente" as const, name: "Envio de boleto p/ cliente", description: "Boleto da taxa de avaliação enviado", icon: Barcode },
+    { key: "laudo" as const, name: "Laudo", description: "Emissão e validação do laudo de engenharia", icon: FileCheck },
     { key: "signature" as const, name: "Assinatura do contrato bancário", description: "Assinatura do contrato de financiamento", icon: FileCheck },
     { key: "itbi" as const, name: "Recolhimento de ITBI", description: "Pagamento do Imposto sobre Transmissão de Bens Imóveis", icon: Receipt },
     { key: "registry" as const, name: "Entrada cartório para registro", description: "Registro da escritura no cartório", icon: ScrollText },
@@ -203,13 +228,15 @@ export default function ClientePage() {
 
   const completedSteps = process
     ? [
-        process.status_steps.engineering,
+        process.status_steps.solicitacao_engenharia,
+        process.status_steps.envio_boleto_cliente,
+        process.status_steps.laudo,
         process.status_steps.signature,
         process.status_steps.itbi,
         process.status_steps.registry,
       ].filter(Boolean).length
     : 0;
-  const totalSteps = 4;
+  const totalSteps = 6;
   const progressPercentage = process ? (completedSteps / totalSteps) * 100 : 0;
 
   return (

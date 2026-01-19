@@ -33,7 +33,6 @@ import {
   Upload,
   Cloud,
   X,
-  HardHat,
   FileSignature,
   Receipt,
   ScrollText,
@@ -44,6 +43,9 @@ import {
   XCircle,
   Download,
   FolderOpen,
+  ClipboardList,
+  Barcode,
+  FileCheck,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -60,7 +62,9 @@ type Process = {
   contract_filename: string | null;
   status_steps: {
     upload: boolean;
-    engineering: boolean;
+    solicitacao_engenharia: boolean;
+    envio_boleto_cliente: boolean;
+    laudo: boolean;
     signature: boolean;
     itbi: boolean;
     registry: boolean;
@@ -82,7 +86,9 @@ type ProcessStep = {
 // Função auxiliar para calcular etapas concluídas
 const getStepsCompleted = (statusSteps: Process["status_steps"]): number => {
   const steps = [
-    statusSteps.engineering,
+    statusSteps.solicitacao_engenharia,
+    statusSteps.envio_boleto_cliente,
+    statusSteps.laudo,
     statusSteps.signature,
     statusSteps.itbi,
     statusSteps.registry,
@@ -159,8 +165,27 @@ export default function AdminPage() {
       if (error) throw error;
 
       if (data) {
-        setProcesses(data as Process[]);
-        setFilteredProcesses(data as Process[]);
+        const normalized = (data as any[]).map((p) => {
+          const steps = p.status_steps || {};
+          const legacyEngineering = !!steps.engineering;
+
+          return {
+            ...p,
+            status_steps: {
+              upload: !!steps.upload,
+              solicitacao_engenharia: steps.solicitacao_engenharia ?? legacyEngineering,
+              envio_boleto_cliente: steps.envio_boleto_cliente ?? legacyEngineering,
+              laudo: steps.laudo ?? legacyEngineering,
+              signature: !!steps.signature,
+              itbi: !!steps.itbi,
+              registry: !!steps.registry,
+              delivery: !!steps.delivery,
+            },
+          };
+        }) as Process[];
+
+        setProcesses(normalized);
+        setFilteredProcesses(normalized);
       }
     } catch (error) {
       console.error("Erro ao buscar processos:", error);
@@ -371,7 +396,9 @@ export default function AdminPage() {
 
     // 5. Se todas as etapas intermediárias estão concluídas, marca entrega como concluída
     const intermediateSteps = [
-      currentSteps.engineering,
+      currentSteps.solicitacao_engenharia,
+      currentSteps.envio_boleto_cliente,
+      currentSteps.laudo,
       currentSteps.signature,
       currentSteps.itbi,
       currentSteps.registry,
@@ -664,7 +691,9 @@ export default function AdminPage() {
           contract_filename: contractFilename,
           status_steps: {
             upload: true,
-            engineering: false,
+            solicitacao_engenharia: false,
+            envio_boleto_cliente: false,
+            laudo: false,
             signature: false,
             itbi: false,
             registry: false,
@@ -979,7 +1008,7 @@ export default function AdminPage() {
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {filteredProcesses.map((process) => {
               const stepsCompleted = getStepsCompleted(process.status_steps);
-              const totalSteps = 4; // engineering, signature, itbi, registry
+              const totalSteps = 6; // solicitacao_engenharia, envio_boleto_cliente, laudo, signature, itbi, registry
               
               return (
                 <Card
@@ -1092,11 +1121,13 @@ export default function AdminPage() {
             if (!selectedProcess) return null;
 
             const stepsCompleted = getStepsCompleted(selectedProcess.status_steps);
-            const totalSteps = 4;
+            const totalSteps = 6;
 
             const stepsConfig = [
               { key: "upload" as const, name: "Upload do Contrato", description: "Contrato PDF enviado pela imobiliária", icon: FileText },
-              { key: "engineering" as const, name: "Engenharia do banco", description: "Análise e aprovação do financiamento bancário", icon: HardHat },
+              { key: "solicitacao_engenharia" as const, name: "Solicitação Engenharia", description: "Solicitação de vistoria enviada ao banco", icon: ClipboardList },
+              { key: "envio_boleto_cliente" as const, name: "Envio de boleto p/ cliente", description: "Boleto da taxa de avaliação enviado", icon: Barcode },
+              { key: "laudo" as const, name: "Laudo", description: "Emissão e validação do laudo de engenharia", icon: FileCheck },
               { key: "signature" as const, name: "Assinatura do contrato bancário", description: "Assinatura do contrato de financiamento", icon: FileSignature },
               { key: "itbi" as const, name: "Recolhimento de ITBI", description: "Pagamento do Imposto sobre Transmissão de Bens Imóveis", icon: Receipt },
               { key: "registry" as const, name: "Entrada cartório para registro", description: "Registro da escritura no cartório", icon: ScrollText },
