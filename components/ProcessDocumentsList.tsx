@@ -8,6 +8,7 @@ import { User, Building2, FileText, Download, CheckCircle2, Clock, Plus, Trash2 
 import { createClient } from "@/lib/supabase/client";
 import type { ProcessDocument } from "@/types/documents";
 import ProcessDocumentsForm from "./ProcessDocumentsForm";
+import { logHelpers } from "@/lib/process-logs";
 
 const PROCESS_DOCS_BUCKET = "arquivos";
 
@@ -146,6 +147,18 @@ export default function ProcessDocumentsList({
 
         if (dbError) throw dbError;
 
+        // Registrar log de exclusão de documento
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const fileName = docs.documentacao_completa_filename || 'Documento.pdf';
+          await logHelpers.documentDeleted(
+            processId,
+            user.id,
+            doc.person_type,
+            fileName
+          );
+        }
+
         setDocuments((prev: ProcessDocument[]) => prev.filter((d: ProcessDocument) => d.id !== doc.id));
         alert("Documento removido!");
       } catch (error) {
@@ -220,7 +233,7 @@ export default function ProcessDocumentsList({
                 <User className="h-5 w-5 text-[#d4a574]" />
                 <CardTitle className="text-lg">Documentos do Comprador</CardTitle>
               </div>
-              {!isReadOnly && !hasComprador && (
+              {!isReadOnly && (
                 <Button
                   size="sm"
                   className="bg-[#d4a574] hover:bg-[#c49564] text-[#302521] gap-2"
@@ -235,9 +248,8 @@ export default function ProcessDocumentsList({
           <CardContent>
             {hasComprador ? (
               (() => {
-                // Buscar especificamente o documento do tipo dossie_comprador
-                // BUSCA ESTRITA: doc_type: 'dossie_comprador' E person_type: 'comprador'
-                const compradorDoc = documents.find((d) => {
+                // Buscar TODOS os documentos do tipo dossie_comprador
+                const compradorDocs = documents.filter((d) => {
                   const docs = d.documents as any;
                   const hasFilePath = !!docs.file_path;
                   return (
@@ -246,11 +258,12 @@ export default function ProcessDocumentsList({
                     hasFilePath
                   );
                 });
-                if (!compradorDoc) return null;
+                
+                if (compradorDocs.length === 0) return null;
 
-                const isComplete = getDocumentStatus(compradorDoc);
-                const docCount = getDocumentCount(compradorDoc);
-                const totalRequired = getTotalRequiredDocs();
+                const isComplete = compradorDocs.length > 0; // Considera completo se tiver pelo menos 1 arquivo
+                const docCount = compradorDocs.length;
+                const totalRequired = 1; // Mínimo 1 arquivo para considerar completo
 
                 return (
                   <div className="space-y-4">
@@ -262,7 +275,7 @@ export default function ProcessDocumentsList({
                           <Clock className="h-5 w-5 text-amber-600" />
                         )}
                         <span className="font-medium">
-                          {docCount}/{totalRequired} documentos enviados
+                          {docCount} arquivo(s) enviados
                         </span>
                       </div>
                       <span
@@ -276,12 +289,31 @@ export default function ProcessDocumentsList({
                       </span>
                     </div>
 
-                    <DocumentDetails
-                      doc={compradorDoc}
-                      onDelete={handleDeleteDocument}
-                      isDeleting={deletingDocumentId === compradorDoc.id}
-                      isReadOnly={isReadOnly}
-                    />
+                    {/* Lista de documentos */}
+                    <div className="space-y-2">
+                      {compradorDocs.map((compradorDoc) => (
+                        <DocumentDetails
+                          key={compradorDoc.id}
+                          doc={compradorDoc}
+                          onDelete={handleDeleteDocument}
+                          isDeleting={deletingDocumentId === compradorDoc.id}
+                          isReadOnly={isReadOnly}
+                        />
+                      ))}
+                    </div>
+                    
+                    {/* Botão para adicionar mais documentos */}
+                    {!isReadOnly && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full gap-2"
+                        onClick={() => handleOpenForm("comprador")}
+                      >
+                        <Plus className="h-4 w-4" />
+                        Adicionar mais documentos
+                      </Button>
+                    )}
                   </div>
                 );
               })()
@@ -301,7 +333,7 @@ export default function ProcessDocumentsList({
                 <Building2 className="h-5 w-5 text-[#d4a574]" />
                 <CardTitle className="text-lg">Documentos do Vendedor</CardTitle>
               </div>
-              {!isReadOnly && !hasVendedor && (
+              {!isReadOnly && (
                 <Button
                   size="sm"
                   className="bg-[#d4a574] hover:bg-[#c49564] text-[#302521] gap-2"
@@ -316,9 +348,8 @@ export default function ProcessDocumentsList({
           <CardContent>
             {hasVendedor ? (
               (() => {
-                // Buscar especificamente o documento do tipo dossie_vendedor
-                // BUSCA ESTRITA: doc_type: 'dossie_vendedor' E person_type: 'vendedor'
-                const vendedorDoc = documents.find((d) => {
+                // Buscar TODOS os documentos do tipo dossie_vendedor
+                const vendedorDocs = documents.filter((d) => {
                   const docs = d.documents as any;
                   const hasFilePath = !!docs.file_path;
                   return (
@@ -327,11 +358,12 @@ export default function ProcessDocumentsList({
                     hasFilePath
                   );
                 });
-                if (!vendedorDoc) return null;
+                
+                if (vendedorDocs.length === 0) return null;
 
-                const isComplete = getDocumentStatus(vendedorDoc);
-                const docCount = getDocumentCount(vendedorDoc);
-                const totalRequired = getTotalRequiredDocs();
+                const isComplete = vendedorDocs.length > 0; // Considera completo se tiver pelo menos 1 arquivo
+                const docCount = vendedorDocs.length;
+                const totalRequired = 1; // Mínimo 1 arquivo para considerar completo
 
                 return (
                   <div className="space-y-4">
@@ -343,7 +375,7 @@ export default function ProcessDocumentsList({
                           <Clock className="h-5 w-5 text-amber-600" />
                         )}
                         <span className="font-medium">
-                          {docCount}/{totalRequired} documentos enviados
+                          {docCount} arquivo(s) enviados
                         </span>
                       </div>
                       <span
@@ -357,12 +389,31 @@ export default function ProcessDocumentsList({
                       </span>
                     </div>
 
-                    <DocumentDetails
-                      doc={vendedorDoc}
-                      onDelete={handleDeleteDocument}
-                      isDeleting={deletingDocumentId === vendedorDoc.id}
-                      isReadOnly={isReadOnly}
-                    />
+                    {/* Lista de documentos */}
+                    <div className="space-y-2">
+                      {vendedorDocs.map((vendedorDoc) => (
+                        <DocumentDetails
+                          key={vendedorDoc.id}
+                          doc={vendedorDoc}
+                          onDelete={handleDeleteDocument}
+                          isDeleting={deletingDocumentId === vendedorDoc.id}
+                          isReadOnly={isReadOnly}
+                        />
+                      ))}
+                    </div>
+                    
+                    {/* Botão para adicionar mais documentos */}
+                    {!isReadOnly && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full gap-2"
+                        onClick={() => handleOpenForm("vendedor")}
+                      >
+                        <Plus className="h-4 w-4" />
+                        Adicionar mais documentos
+                      </Button>
+                    )}
                   </div>
                 );
               })()

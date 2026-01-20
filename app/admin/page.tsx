@@ -28,29 +28,25 @@ import {
   CheckCircle2,
   Clock,
   LogOut,
-  Home,
-  Plus,
-  Upload,
-  Cloud,
-  X,
-  FileSignature,
-  Receipt,
-  ScrollText,
-  KeyRound,
-  Search,
-  Pencil,
-  Eye,
-  Save,
-  XCircle,
-  Download,
-  FolderOpen,
+  FileCheck,
   ClipboardList,
   Barcode,
-  FileCheck,
+  ScrollText,
+  KeyRound,
+  Edit,
+  Eye,
+  Plus,
+  X,
+  Search,
+  User,
+  Building2,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { getSupabaseClient } from "@/lib/supabase/server";
 import { createClient } from "@/lib/supabase/client";
+import { logHelpers } from "@/lib/process-logs";
+import { useRouter } from "next/navigation";
 import ProcessDocumentsList from "@/components/ProcessDocumentsList";
+import ProcessHistory from "@/components/ProcessHistory";
 
 // Tipo para processo (do Supabase)
 type Process = {
@@ -328,6 +324,33 @@ export default function AdminPage() {
 
       if (error) throw error;
 
+      // Registrar log de atualização do processo
+      const client = createClient();
+      const { data: { user } } = await client.auth.getUser();
+      if (user) {
+        const process = processes.find(p => p.id === selectedProcessId);
+        if (process) {
+          if (process.client_name !== editFormData.client_name.trim()) {
+            await logHelpers.processUpdated(
+              selectedProcessId,
+              user.id,
+              'client_name',
+              process.client_name,
+              editFormData.client_name.trim()
+            );
+          }
+          if (process.property_address !== editFormData.property_address.trim()) {
+            await logHelpers.processUpdated(
+              selectedProcessId,
+              user.id,
+              'property_address',
+              process.property_address,
+              editFormData.property_address.trim() || null
+            );
+          }
+        }
+      }
+
       // Atualiza estado local
       setProcesses((prev) =>
         prev.map((p) =>
@@ -446,6 +469,20 @@ export default function AdminPage() {
       if (error) {
         console.error("Erro ao atualizar etapa no Supabase:", error);
         throw error;
+      }
+
+      // Registrar log de toggle de etapa
+      const client = createClient();
+      const { data: { user } } = await client.auth.getUser();
+      if (user) {
+        const stepConfig = stepsConfig.find(step => step.key === stepKey);
+        const stepName = stepConfig ? stepConfig.name : stepKey;
+        await logHelpers.stepToggled(
+          processId,
+          user.id,
+          stepName,
+          novoValor
+        );
       }
 
       // 9. Sucesso: Mostra toast de confirmação
@@ -709,6 +746,25 @@ export default function AdminPage() {
         .single();
 
       if (error) throw error;
+
+      // Registrar log de criação de processo
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await logHelpers.processCreated(
+          data.id,
+          user.id,
+          formData.clientName
+        );
+        
+        // Se houver contrato, registrar log também
+        if (contractUrl && contractFilename) {
+          await logHelpers.contractUploaded(
+            data.id,
+            user.id,
+            contractFilename
+          );
+        }
+      }
 
       // Se houver contrato inicial, salvar também na tabela process_documents
       if (data && contractUrl && contractFilename && contractFilePath) {
@@ -1343,6 +1399,11 @@ export default function AdminPage() {
                       processClientName={selectedProcess.client_name}
                       isReadOnly={isReadOnlyView}
                     />
+                  </div>
+
+                  {/* Histórico de Atividades */}
+                  <div className="mt-6">
+                    <ProcessHistory processId={selectedProcess.id} />
                   </div>
                 </div>
               </>

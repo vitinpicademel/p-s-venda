@@ -18,6 +18,7 @@ import { Upload, FileText, X, User, Building2, Cloud } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { DocumentFormData, PersonType } from "@/types/documents";
 import { useToast } from "@/components/ui/toast";
+import { logHelpers } from "@/lib/process-logs";
 
 const PROCESS_DOCS_BUCKET = "arquivos";
 
@@ -41,13 +42,13 @@ export default function ProcessDocumentsForm({
   const { showToast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [personType, setPersonType] = useState<PersonType>(initialPersonType);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
 
   // Reset form when dialog closes
   useEffect(() => {
     if (!open) {
-      setSelectedFile(null);
+      setSelectedFiles([]);
       setPersonType(initialPersonType);
     } else {
       setPersonType(initialPersonType);
@@ -60,27 +61,31 @@ export default function ProcessDocumentsForm({
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.type !== "application/pdf") {
-        showToast({
-          title: "Formato inválido",
-          description: "Por favor, selecione um arquivo PDF",
-          type: "error",
-        });
-        return;
-      }
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      const validFiles = files.filter(file => {
+        if (file.type !== "application/pdf") {
+          showToast({
+            title: "Formato inválido",
+            description: `O arquivo ${file.name} não é um PDF`,
+            type: "error",
+          });
+          return false;
+        }
 
-      if (file.size > 100 * 1024 * 1024) {
-        showToast({
-          title: "Arquivo muito grande",
-          description: "O arquivo deve ter no máximo 100MB",
-          type: "error",
-        });
-        return;
-      }
+        if (file.size > 100 * 1024 * 1024) {
+          showToast({
+            title: "Arquivo muito grande",
+            description: `O arquivo ${file.name} deve ter no máximo 100MB`,
+            type: "error",
+          });
+          return false;
+        }
 
-      setSelectedFile(file);
+        return true;
+      });
+
+      setSelectedFiles(prev => [...prev, ...validFiles]);
     }
   };
 
@@ -97,28 +102,40 @@ export default function ProcessDocumentsForm({
     e.preventDefault();
     setIsDragging(false);
 
-    const file = e.dataTransfer.files[0];
-    if (file && file.type === "application/pdf") {
-      if (file.size > 100 * 1024 * 1024) {
-        showToast({
-          title: "Arquivo muito grande",
-          description: "O arquivo deve ter no máximo 100MB",
-          type: "error",
-        });
-        return;
-      }
-      setSelectedFile(file);
-    } else {
-      showToast({
-        title: "Formato inválido",
-        description: "Por favor, arraste um arquivo PDF",
-        type: "error",
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) {
+      const validFiles = files.filter(file => {
+        if (file.type !== "application/pdf") {
+          showToast({
+            title: "Formato inválido",
+            description: `O arquivo ${file.name} não é um PDF`,
+            type: "error",
+          });
+          return false;
+        }
+
+        if (file.size > 100 * 1024 * 1024) {
+          showToast({
+            title: "Arquivo muito grande",
+            description: `O arquivo ${file.name} deve ter no máximo 100MB`,
+            type: "error",
+          });
+          return false;
+        }
+
+        return true;
       });
+
+      setSelectedFiles(prev => [...prev, ...validFiles]);
     }
   };
 
-  const removeFile = () => {
-    setSelectedFile(null);
+  const removeFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const clearAllFiles = () => {
+    setSelectedFiles([]);
   };
 
   /**
@@ -268,10 +285,10 @@ export default function ProcessDocumentsForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!selectedFile) {
+    if (selectedFiles.length === 0) {
       showToast({
-        title: "Arquivo obrigatório",
-        description: "Por favor, selecione um arquivo PDF",
+        title: "Arquivos obrigatórios",
+        description: "Por favor, selecione pelo menos um arquivo PDF",
         type: "error",
       });
       return;
@@ -291,59 +308,73 @@ export default function ProcessDocumentsForm({
     }
 
     try {
-      // Sanitizar nome do arquivo ANTES de construir o path
-      const sanitizedFileName = sanitizeFileName(selectedFile.name);
-      
-      // Construir path com o nome já sanitizado
-      const filePath = `${processId}/${personType}/${sanitizedFileName}`;
-      const uploaded = await uploadFile(selectedFile, filePath);
+      const uploadPromises = selectedFiles.map(async (file) => {
+        // Sanitizar nome do arquivo ANTES de construir o path
+        const sanitizedFileName = sanitizeFileName(file.name);
+        
+        // Construir path com o nome já sanitizado
+        const filePath = `${processId}/${personType}/${sanitizedFileName}`;
+        const uploaded = await uploadFile(file, filePath);
 
-      if (!uploaded) {
-        throw new Error("Erro ao fazer upload do arquivo");
-      }
-
-      // Salvar no banco de dados
-      // IMPORTANTE: doc_type deve corresponder estritamente ao person_type
-      const docType = personType === "comprador" ? "dossie_comprador" : "dossie_vendedor";
-      
-      // Preparar dados para inserção
-      const insertData: any = {
-        process_id: processId,
-        person_type: personType, // 'comprador' ou 'vendedor'
-        doc_type: docType, // 'dossie_comprador' ou 'dossie_vendedor' - OBRIGATÓRIO
-        // Campo obrigatório no schema atual (evita 23502 not_null_violation)
-        estado_civil: "solteiro",
-        documents: {
-          documentacao_completa_filename: selectedFile.name,
-          // Bucket público + path (usado para getPublicUrl) - OBRIGATÓRIO
-          bucket: uploaded.bucket,
-          file_path: uploaded.path, // CRÍTICO: sem isso, o documento não pode ser visualizado
-          // Tipo genérico do pacote completo (mantido para compatibilidade)
-          doc_type: "documentacao_completa",
-        },
-      };
-      
-      const { error, data } = await supabase.from("process_documents").insert(insertData).select().single();
-
-      if (error) {
-        // Se o erro for porque doc_type não existe ou tem valor inválido
-        if (error.message?.includes("doc_type") || error.message?.includes("column") || error.message?.includes("check constraint")) {
-          console.error("Erro ao salvar documento:", error);
-          throw new Error(
-            "Erro ao salvar documento. Verifique se o SQL ATUALIZAR_DOC_TYPE_CONTRATO_INICIAL.sql foi executado."
-          );
+        if (!uploaded) {
+          throw new Error(`Erro ao fazer upload do arquivo ${file.name}`);
         }
-        throw error;
-      }
 
-      // Validar que o arquivo foi salvo corretamente
-      if (!uploaded.path) {
-        throw new Error("Erro: file_path não foi salvo corretamente");
+        // Salvar no banco de dados
+        // IMPORTANTE: doc_type deve corresponder estritamente ao person_type
+        const docType = personType === "comprador" ? "dossie_comprador" : "dossie_vendedor";
+        
+        // Preparar dados para inserção
+        const insertData: any = {
+          process_id: processId,
+          person_type: personType, // 'comprador' ou 'vendedor'
+          doc_type: docType, // 'dossie_comprador' ou 'dossie_vendedor' - OBRIGATÓRIO
+          // Campo obrigatório no schema atual (evita 23502 not_null_violation)
+          estado_civil: "solteiro",
+          documents: {
+            documentacao_completa_filename: file.name,
+            // Bucket público + path (usado para getPublicUrl) - OBRIGATÓRIO
+            bucket: uploaded.bucket,
+            file_path: uploaded.path, // CRÍTICO: sem isso, o documento não pode ser visualizado
+            // Tipo genérico do pacote completo (mantido para compatibilidade)
+            doc_type: "documentacao_completa",
+          },
+        };
+        
+        const { error, data } = await supabase.from("process_documents").insert(insertData).select().single();
+
+        if (error) {
+          // Se o erro for porque doc_type não existe ou tem valor inválido
+          if (error.message?.includes("doc_type") || error.message?.includes("column") || error.message?.includes("check constraint")) {
+            console.error("Erro ao salvar documento:", error);
+            throw new Error(
+              "Erro ao salvar documento. Verifique se o SQL ATUALIZAR_DOC_TYPE_CONTRATO_INICIAL.sql foi executado."
+            );
+          }
+          throw error;
+        }
+
+        return data;
+      });
+
+      // Aguardar todos os uploads
+      await Promise.all(uploadPromises);
+
+      // Registrar log de upload de documentos
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await logHelpers.documentUploaded(
+          processId,
+          user.id,
+          personType,
+          selectedFiles.map(f => f.name).join(', '),
+          selectedFiles.length
+        );
       }
 
       showToast({
         title: "Documentos enviados com sucesso!",
-        description: `Documentação de ${personType === "comprador" ? "Comprador" : "Vendedor"} foi salva.`,
+        description: `${selectedFiles.length} arquivo(s) de ${personType === "comprador" ? "Comprador" : "Vendedor"} foram salvos.`,
         type: "success",
       });
 
@@ -417,34 +448,56 @@ export default function ProcessDocumentsForm({
                 id="documentacao_completa"
                 type="file"
                 accept=".pdf"
+                multiple
                 onChange={handleFileSelect}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               />
-              {selectedFile ? (
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-green-100 rounded-lg">
-                      <FileText className="h-6 w-6 text-green-600" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-slate-800">{selectedFile.name}</p>
-                      <p className="text-sm text-slate-500">
-                        {(selectedFile.size / 1024).toFixed(2)} KB
-                      </p>
-                    </div>
+              {selectedFiles.length > 0 ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-medium text-slate-700">
+                      {selectedFiles.length} arquivo(s) selecionados
+                    </p>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        clearAllFiles();
+                      }}
+                      className="text-xs text-red-600 hover:text-red-700"
+                    >
+                      Limpar todos
+                    </Button>
                   </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeFile();
-                    }}
-                    className="h-8 w-8"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
+                  <div className="max-h-40 overflow-y-auto space-y-2">
+                    {selectedFiles.map((file, index) => (
+                      <div key={index} className="flex items-center justify-between p-2 bg-white border rounded-lg">
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <FileText className="h-4 w-4 text-green-600 flex-shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-slate-800 truncate">{file.name}</p>
+                            <p className="text-xs text-slate-500">
+                              {(file.size / 1024).toFixed(2)} KB
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeFile(index);
+                          }}
+                          className="h-6 w-6 flex-shrink-0"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ) : (
                 <div className="text-center">
@@ -454,10 +507,13 @@ export default function ProcessDocumentsForm({
                     </div>
                   </div>
                   <p className="text-sm font-medium text-slate-700 mb-1">
-                    Clique ou arraste o arquivo PDF aqui
+                    Clique ou arraste os arquivos PDF aqui
                   </p>
                   <p className="text-xs text-slate-500">
-                    Apenas arquivos PDF são aceitos (máximo 100MB)
+                    Apenas arquivos PDF são aceitos (máximo 100MB cada)
+                  </p>
+                  <p className="text-xs text-slate-400 mt-2">
+                    Você pode selecionar vários arquivos de uma vez
                   </p>
                   <p className="text-xs text-slate-400 mt-2">
                     Inclua toda a documentação digitalizada (CPF, RG, Certidões, etc.)
@@ -474,7 +530,7 @@ export default function ProcessDocumentsForm({
             <Button
               type="submit"
               className="bg-[#d4a574] hover:bg-[#c49564] text-[#302521]"
-              disabled={isSubmitting || !selectedFile}
+              disabled={isSubmitting || selectedFiles.length === 0}
             >
               {isSubmitting ? (
                 <>
