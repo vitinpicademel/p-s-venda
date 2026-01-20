@@ -90,8 +90,22 @@ export async function middleware(request: NextRequest) {
 
     // Se JÁ estiver logado e tentar acessar login ou cadastro
     if (user && (pathname === '/login' || pathname === '/signup' || pathname === '/')) {
-      // Redireciona baseado no email
-      if (user.email?.includes('admin') || user.email?.includes('donna')) {
+      // Busca o role do usuário na tabela profiles
+      let userRole = null
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single()
+        userRole = profile?.role
+      } catch (error) {
+        // Se der erro, continua com a lógica de email
+        console.error('Erro ao buscar role:', error)
+      }
+
+      // Redireciona baseado no role OU email
+      if (userRole === 'admin' || user.email?.includes('admin') || user.email?.includes('donna')) {
         return NextResponse.redirect(new URL('/admin', request.url))
       } else {
         return NextResponse.redirect(new URL('/cliente', request.url))
