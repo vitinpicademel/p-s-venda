@@ -40,13 +40,34 @@ import {
   Search,
   User,
   Building2,
+  Home,
+  Cloud,
+  Upload,
+  Download,
+  Pencil,
+  Save,
+  XCircle,
+  FolderOpen,
+  FileSignature,
+  Receipt,
 } from "lucide-react";
-import { getSupabaseClient } from "@/lib/supabase/server";
 import { createClient } from "@/lib/supabase/client";
 import { logHelpers } from "@/lib/process-logs";
 import { useRouter } from "next/navigation";
 import ProcessDocumentsList from "@/components/ProcessDocumentsList";
 import ProcessHistory from "@/components/ProcessHistory";
+
+// Configuração das etapas do processo
+const stepsConfig = [
+  { key: "upload" as const, name: "Upload do Contrato", description: "Contrato PDF enviado pela imobiliária", icon: FileText },
+  { key: "solicitacao_engenharia" as const, name: "Solicitação Engenharia", description: "Solicitação de vistoria enviada ao banco", icon: ClipboardList },
+  { key: "envio_boleto_cliente" as const, name: "Envio de boleto p/ cliente", description: "Boleto da taxa de avaliação enviado", icon: Barcode },
+  { key: "laudo" as const, name: "Laudo", description: "Emissão e validação do laudo de engenharia", icon: FileCheck },
+  { key: "signature" as const, name: "Assinatura do contrato bancário", description: "Assinatura do contrato de financiamento", icon: FileSignature },
+  { key: "itbi" as const, name: "Recolhimento de ITBI", description: "Pagamento do Imposto sobre Transmissão de Bens Imóveis", icon: Receipt },
+  { key: "registry" as const, name: "Entrada cartório para registro", description: "Registro da escritura no cartório", icon: ScrollText },
+  { key: "delivery" as const, name: "Entrega de Chaves", description: "Entrega das chaves e conclusão do processo", icon: KeyRound },
+];
 
 // Tipo para processo (do Supabase)
 type Process = {
@@ -331,22 +352,26 @@ export default function AdminPage() {
         const process = processes.find(p => p.id === selectedProcessId);
         if (process) {
           if (process.client_name !== editFormData.client_name.trim()) {
-            await logHelpers.processUpdated(
-              selectedProcessId,
-              user.id,
-              'client_name',
-              process.client_name,
-              editFormData.client_name.trim()
-            );
+            if (user && user.id) {
+              await logHelpers.processUpdated(
+                selectedProcessId,
+                user.id,
+                'client_name',
+                process.client_name,
+                editFormData.client_name.trim()
+              );
+            }
           }
           if (process.property_address !== editFormData.property_address.trim()) {
-            await logHelpers.processUpdated(
-              selectedProcessId,
-              user.id,
-              'property_address',
-              process.property_address,
-              editFormData.property_address.trim() || null
-            );
+            if (user && user.id) {
+              await logHelpers.processUpdated(
+                selectedProcessId,
+                user.id,
+                'property_address',
+                process.property_address || undefined,
+                editFormData.property_address.trim() || undefined
+              );
+            }
           }
         }
       }
@@ -1202,17 +1227,6 @@ export default function AdminPage() {
 
             const stepsCompleted = getStepsCompleted(selectedProcess.status_steps);
             const totalSteps = 6;
-
-            const stepsConfig = [
-              { key: "upload" as const, name: "Upload do Contrato", description: "Contrato PDF enviado pela imobiliária", icon: FileText },
-              { key: "solicitacao_engenharia" as const, name: "Solicitação Engenharia", description: "Solicitação de vistoria enviada ao banco", icon: ClipboardList },
-              { key: "envio_boleto_cliente" as const, name: "Envio de boleto p/ cliente", description: "Boleto da taxa de avaliação enviado", icon: Barcode },
-              { key: "laudo" as const, name: "Laudo", description: "Emissão e validação do laudo de engenharia", icon: FileCheck },
-              { key: "signature" as const, name: "Assinatura do contrato bancário", description: "Assinatura do contrato de financiamento", icon: FileSignature },
-              { key: "itbi" as const, name: "Recolhimento de ITBI", description: "Pagamento do Imposto sobre Transmissão de Bens Imóveis", icon: Receipt },
-              { key: "registry" as const, name: "Entrada cartório para registro", description: "Registro da escritura no cartório", icon: ScrollText },
-              { key: "delivery" as const, name: "Entrega de Chaves", description: "Entrega das chaves e conclusão do processo", icon: KeyRound },
-            ];
 
             return (
               <>

@@ -438,7 +438,7 @@ export default function ProcessDocumentsForm({
                 ${
                   isDragging
                     ? "border-[#d4a574] bg-amber-50"
-                    : selectedFile
+                    : selectedFiles.length > 0
                     ? "border-green-500 bg-green-50"
                     : "border-slate-300 bg-slate-50 hover:border-[#d4a574] hover:bg-slate-100"
                 }
