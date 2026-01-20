@@ -97,9 +97,31 @@ export default function LoginPage() {
         // Limpa cache do Next.js
         router.refresh();
 
-        // Verificação simples de email para redirecionamento
+        // Verificação de role do usuário + email para redirecionamento
         const emailLower = email.toLowerCase();
-        const redirectPath = emailLower.includes('admin') || emailLower.includes('donna') ? '/admin' : '/cliente';
+        let redirectPath = '/cliente'; // padrão
+        
+        // Busca o role do usuário no Supabase
+        try {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', data.user.id)
+            .single();
+          
+          // Se role for admin OU email contiver admin/donna, vai para admin
+          if (profile?.role === 'admin' || emailLower.includes('admin') || emailLower.includes('donna')) {
+            redirectPath = '/admin';
+          }
+          
+          console.log("🟢 [LOGIN] Role encontrado:", profile?.role);
+        } catch (roleError) {
+          console.error("🔴 [LOGIN] Erro ao buscar role:", roleError);
+          // Fallback para lógica de email apenas
+          if (emailLower.includes('admin') || emailLower.includes('donna')) {
+            redirectPath = '/admin';
+          }
+        }
         
         console.log("🟢 [LOGIN] Tentando redirecionar para:", redirectPath);
 
