@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS processes (
   client_name TEXT NOT NULL,
   property_address TEXT,
   property_value DECIMAL(12, 2),
+  observations TEXT,
   contract_url TEXT, -- URL do PDF do contrato no Supabase Storage
   contract_filename TEXT,
   status_steps JSONB DEFAULT '{
@@ -191,4 +192,3 @@ $$ LANGUAGE plpgsql IMMUTABLE;
 --         AND processes.client_email = (SELECT email FROM auth.users WHERE id = auth.uid())
 --     )
 --   );
-
