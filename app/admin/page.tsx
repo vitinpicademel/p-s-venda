@@ -76,6 +76,7 @@ type Process = {
   client_email: string;
   property_address: string | null;
   property_value: number | null;
+  observations: string | null;
   contract_url: string | null;
   contract_filename: string | null;
   status_steps: {
@@ -141,6 +142,9 @@ export default function AdminPage() {
   });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [observationsText, setObservationsText] = useState("");
+  const [isSavingObservations, setIsSavingObservations] = useState(false);
+  const [saveObservationsStatus, setSaveObservationsStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   // Buscar processos do Supabase
   useEffect(() => {
@@ -229,6 +233,8 @@ export default function AdminPage() {
         client_name: process.client_name,
         property_address: process.property_address || "",
       });
+      setObservationsText(process.observations || "");
+      setSaveObservationsStatus("idle");
     }
   };
 
@@ -290,6 +296,52 @@ export default function AdminPage() {
       showToast({
         title: "Erro no download",
         description: "Não foi possível baixar o contrato. Tente novamente.",
+        type: "error",
+      });
+    }
+  };
+
+  const handleSaveObservations = async () => {
+    if (!selectedProcessId || isReadOnlyView) return;
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+    const text = observationsText.trim();
+    const current = processes.find((p) => p.id === selectedProcessId);
+    if (current && (current.observations || "") === text) return;
+    try {
+      setIsSavingObservations(true);
+      setSaveObservationsStatus("saving");
+      const { error } = await supabase
+        .from("processes")
+        .update({ observations: text || null })
+        .eq("id", selectedProcessId);
+      setIsSavingObservations(false);
+      if (error) {
+        setSaveObservationsStatus("error");
+        showToast({
+          title: "Erro ao salvar observações",
+          description: error.message || "Tente novamente",
+          type: "error",
+        });
+        return;
+      }
+      setSaveObservationsStatus("saved");
+      setProcesses((prev) =>
+        prev.map((p) =>
+          p.id === selectedProcessId ? { ...p, observations: text || null } : p
+        )
+      );
+      setFilteredProcesses((prev) =>
+        prev.map((p) =>
+          p.id === selectedProcessId ? { ...p, observations: text || null } : p
+        )
+      );
+    } catch (err: any) {
+      setIsSavingObservations(false);
+      setSaveObservationsStatus("error");
+      showToast({
+        title: "Erro ao salvar observações",
+        description: err?.message || "Tente novamente",
         type: "error",
       });
     }
@@ -1335,6 +1387,22 @@ export default function AdminPage() {
                           width: `${(stepsCompleted / totalSteps) * 100}%`,
                         }}
                       />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h3 className="text-lg font-semibold text-slate-800">Observações Gerais</h3>
+                    <textarea
+                      value={observationsText}
+                      onChange={(e) => setObservationsText(e.target.value)}
+                      onBlur={handleSaveObservations}
+                      disabled={isReadOnlyView}
+                      rows={4}
+                      className="w-full p-3 border border-slate-200 rounded-lg bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#d4a574]"
+                      placeholder="Escreva observações internas sobre este processo..."
+                    />
+                    <div className="text-xs text-slate-500 h-4">
+                      {isSavingObservations ? "Salvando..." : saveObservationsStatus === "saved" ? "Salvo" : saveObservationsStatus === "error" ? "Erro ao salvar" : ""}
                     </div>
                   </div>
 
