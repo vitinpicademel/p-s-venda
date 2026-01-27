@@ -1395,14 +1395,22 @@ export default function AdminPage() {
                     <textarea
                       value={observationsText}
                       onChange={(e) => setObservationsText(e.target.value)}
-                      onBlur={handleSaveObservations}
                       disabled={isReadOnlyView}
                       rows={4}
                       className="w-full p-3 border border-slate-200 rounded-lg bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#d4a574]"
                       placeholder="Escreva observações internas sobre este processo..."
                     />
-                    <div className="text-xs text-slate-500 h-4">
-                      {isSavingObservations ? "Salvando..." : saveObservationsStatus === "saved" ? "Salvo" : saveObservationsStatus === "error" ? "Erro ao salvar" : ""}
+                    <div className="flex items-center justify-end mt-2">
+                      <Button
+                        onClick={handleSaveObservations}
+                        disabled={isReadOnlyView || isSavingObservations}
+                        className="bg-[#d4a574] hover:bg-[#c49564] text-[#302521]"
+                      >
+                        {isSavingObservations ? "Salvando..." : "Salvar Observação"}
+                      </Button>
+                    </div>
+                    <div className="text-xs text-slate-500 h-4 mt-1">
+                      {saveObservationsStatus === "saved" ? "Observação salva com sucesso!" : saveObservationsStatus === "error" ? "Erro ao salvar" : ""}
                     </div>
                   </div>
 
