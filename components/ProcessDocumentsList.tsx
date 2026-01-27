@@ -134,11 +134,18 @@ export default function ProcessDocumentsList({
       try {
         setDeletingDocumentId(doc.id);
 
+        const bucketToUse = (docs.bucket as string) || PROCESS_DOCS_BUCKET;
+        if (!bucketToUse) {
+          throw new Error("Bucket não informado para o documento.");
+        }
+
         const { error: storageError } = await supabase.storage
-          .from(PROCESS_DOCS_BUCKET)
+          .from(bucketToUse)
           .remove([filePath]);
 
-        if (storageError) throw storageError;
+        // Prosseguir mesmo se o arquivo não existir no storage (404), para garantir remoção do registro
+        const isNotFound = (storageError as any)?.statusCode === 404 || /not found/i.test(storageError?.message || "");
+        if (storageError && !isNotFound) throw storageError;
 
         const { error: dbError } = await supabase
           .from("process_documents")
