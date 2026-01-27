@@ -168,7 +168,7 @@ export default function ProcessDocumentsList({
         setDeletingDocumentId(null);
       }
     },
-    [supabase]
+    [supabase, processId]
   );
 
   const getDocumentStatus = (doc: ProcessDocument) => {
