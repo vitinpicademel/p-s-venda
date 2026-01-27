@@ -536,13 +536,14 @@ function DocumentDetails({
         </div>
         <div className="flex items-center gap-2">
           <Button
-            size="sm"
+            size="icon"
             variant="outline"
             onClick={handleDownload}
-            className="gap-2"
+            className="text-slate-600 hover:text-slate-700"
+            aria-label="Baixar"
+            title="Baixar"
           >
-            <Download className="h-3 w-3" />
-            Baixar PDF
+            <Download className="h-4 w-4" />
           </Button>
           {!isReadOnly && (
             <Button
@@ -551,6 +552,8 @@ function DocumentDetails({
               onClick={() => onDelete(doc)}
               disabled={isDeleting}
               className="text-red-600 hover:text-red-700"
+              aria-label="Excluir"
+              title="Excluir"
             >
               <Trash2 className="h-4 w-4" />
             </Button>
