@@ -1137,20 +1137,24 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* Seção Superior - Kanban Compacto */}
-        <div className="mb-8">
-          <h2 className="text-xl font-bold text-slate-800 mb-4">Visão Geral - Fluxo de Processos</h2>
-          <div className="overflow-x-auto bg-gray-50 rounded-lg p-4">
-            <div className="grid grid-cols-8 gap-4 min-w-[1400px] max-h-[300px]">
+        {/* Seção Superior - Kanban Executivo Premium */}
+        <div className="mb-12">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-light tracking-wider text-stone-700 uppercase">Visão Geral</h2>
+            <div className="text-xs font-medium tracking-widest text-stone-500">Fluxo de Processos</div>
+          </div>
+          
+          <div className="overflow-x-auto">
+            <div className="grid grid-cols-8 gap-8 min-w-[1600px] max-h-[320px]">
               {[
-                { key: "upload", name: "Upload", slaDays: 1, color: "bg-blue-100 border-blue-200" },
-                { key: "solicitacao_engenharia", name: "Engenharia", slaDays: 2, color: "bg-purple-100 border-purple-200" },
-                { key: "envio_boleto_cliente", name: "Boleto", slaDays: 1, color: "bg-orange-100 border-orange-200" },
-                { key: "laudo", name: "Laudo", slaDays: 5, color: "bg-green-100 border-green-200" },
-                { key: "signature", name: "Assinatura", slaDays: 3, color: "bg-indigo-100 border-indigo-200" },
-                { key: "itbi", name: "ITBI", slaDays: 7, color: "bg-red-100 border-red-200" },
-                { key: "registry", name: "Cartório", slaDays: 10, color: "bg-yellow-100 border-yellow-200" },
-                { key: "delivery", name: "Entrega", slaDays: 2, color: "bg-emerald-100 border-emerald-200" },
+                { key: "upload", name: "Upload", slaDays: 1 },
+                { key: "solicitacao_engenharia", name: "Engenharia", slaDays: 2 },
+                { key: "envio_boleto_cliente", name: "Boleto", slaDays: 1 },
+                { key: "laudo", name: "Laudo", slaDays: 5 },
+                { key: "signature", name: "Assinatura", slaDays: 3 },
+                { key: "itbi", name: "ITBI", slaDays: 7 },
+                { key: "registry", name: "Cartório", slaDays: 10 },
+                { key: "delivery", name: "Entrega", slaDays: 2 },
               ].map((column) => {
                 // LÓGICA CRÍTICA: Encontrar primeira etapa pendente
                 const columnProcesses = filteredProcesses.filter(process => {
@@ -1188,31 +1192,33 @@ export default function AdminPage() {
                 }).length;
                 
                 return (
-                  <div key={column.key} className={`${column.color} rounded-lg border min-h-0 flex flex-col`}>
-                    {/* Header Compacto da Coluna */}
-                    <div className="p-2 border-b border-current border-opacity-20 flex-shrink-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <h3 className="font-semibold text-xs text-slate-800">{column.name}</h3>
-                        <div className="flex items-center gap-1">
+                  <div key={column.key} className="min-h-0 flex flex-col">
+                    {/* Header Executivo */}
+                    <div className="pb-3 mb-3 border-b border-stone-100 flex-shrink-0">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-xs font-bold tracking-widest uppercase text-stone-600">
+                          {column.name}
+                        </h3>
+                        <div className="flex items-center gap-2">
                           {overdueCount > 0 && (
-                            <div className="flex items-center text-red-600">
+                            <div className="flex items-center text-red-800">
                               <AlertTriangle className="h-3 w-3 mr-1" />
-                              <span className="text-xs font-bold">{overdueCount}</span>
+                              <span className="text-xs font-medium">{overdueCount}</span>
                             </div>
                           )}
-                          <span className="bg-white bg-opacity-70 px-1 py-0.5 rounded-full text-xs font-medium text-slate-700">
+                          <span className="px-2 py-0.5 bg-stone-50 rounded-full text-xs font-medium text-stone-600">
                             {columnProcesses.length}
                           </span>
                         </div>
                       </div>
-                      <div className="flex items-center text-xs text-slate-600">
-                        <Clock className="h-2 w-2 mr-1" />
+                      <div className="flex items-center text-xs text-stone-400">
+                        <Clock className="h-3 w-3 mr-1" />
                         {column.slaDays}d
                       </div>
                     </div>
 
-                    {/* Lista de Processos - MINI-CARDS COM SCROLL */}
-                    <div className="flex-1 p-2 space-y-1 overflow-y-auto">
+                    {/* Lista de Processos - CARDS DE LUXO COM SCROLL OCULTO */}
+                    <div className="flex-1 space-y-3 overflow-y-auto scrollbar-hide">
                       {columnProcesses.map((process) => {
                         const daysInStep = getDaysInCurrentStep(process);
                         const isOverdue = daysInStep > column.slaDays;
@@ -1220,22 +1226,22 @@ export default function AdminPage() {
                         return (
                           <div
                             key={process.id}
-                            className={`group cursor-pointer bg-white rounded shadow-sm hover:shadow transition-all duration-200 p-2 border ${
-                              isOverdue ? 'border-red-400 border-l-2' : 'border-gray-200'
+                            className={`group cursor-pointer bg-white border border-stone-100 rounded-lg shadow-[0_4px_20px_-2px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_30px_-2px_rgba(0,0,0,0.08)] transition-all duration-300 p-4 ${
+                              isOverdue 
+                                ? 'border-l-4 border-l-red-800' 
+                                : 'border-l-4 border-l-amber-400'
                             }`}
                             onClick={() => handleOpenSheet(process.id, false)}
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex-1 min-w-0">
-                                {/* APENAS NOME DO CLIENTE */}
-                                <p className={`text-xs font-medium truncate pr-1 ${
-                                  isOverdue ? 'text-red-600 font-bold' : 'text-slate-900'
-                                }`}>
+                                {/* NOME DO CLIENTE - TIPOGRAFIA EXECUTIVA */}
+                                <p className="text-sm font-medium text-stone-800 truncate pr-3">
                                   {process.client_name}
                                 </p>
                               </div>
                               {isOverdue && (
-                                <AlertTriangle className="h-3 w-3 text-red-500 flex-shrink-0" />
+                                <AlertTriangle className="h-4 w-4 text-red-600 flex-shrink-0 opacity-70" />
                               )}
                             </div>
                           </div>
@@ -1243,8 +1249,9 @@ export default function AdminPage() {
                       })}
                       
                       {columnProcesses.length === 0 && (
-                        <div className="text-center py-4 text-slate-400">
-                          <p className="text-xs">-</p>
+                        <div className="text-center py-6">
+                          <div className="w-8 h-0.5 bg-stone-200 mx-auto mb-3"></div>
+                          <p className="text-xs text-stone-400">Vazio</p>
                         </div>
                       )}
                     </div>
@@ -1255,8 +1262,17 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* Divisória */}
-        <hr className="my-8 border-gray-300" />
+        {/* Divisória Elegante */}
+        <div className="relative my-16">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-stone-200"></div>
+          </div>
+          <div className="relative flex justify-center">
+            <span className="px-4 bg-white text-xs font-medium tracking-widest uppercase text-stone-400">
+              Detalhamento dos Processos
+            </span>
+          </div>
+        </div>
 
         {/* Seção Inferior - Lista Detalhada */}
         <div>
