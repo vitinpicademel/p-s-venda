@@ -50,6 +50,7 @@ import {
   FolderOpen,
   FileSignature,
   Receipt,
+  AlertTriangle,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { logHelpers } from "@/lib/process-logs";
@@ -1136,105 +1137,149 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* Cards Grid */}
+        {/* Kanban Board */}
         {isLoading ? (
           <div className="text-center py-12">
             <p className="text-slate-500">Carregando processos...</p>
           </div>
         ) : (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {filteredProcesses.map((process) => {
-              const stepsCompleted = getStepsCompleted(process.status_steps);
-              const totalSteps = 6; // solicitacao_engenharia, envio_boleto_cliente, laudo, signature, itbi, registry
-              
-              return (
-                <Card
-                  key={process.id}
-                  className="hover:shadow-lg transition-shadow duration-200 border-slate-200"
-                >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <CardTitle className="text-lg font-semibold text-slate-800 mb-1">
-                          {process.client_name}
-                        </CardTitle>
-                        <CardDescription className="text-sm text-slate-600">
-                          {process.client_email}
-                        </CardDescription>
-                      </div>
-                      <FileText className="h-5 w-5 text-[#d4a574]" />
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
-                        Imóvel
-                      </p>
-                      <p className="text-sm text-slate-700 leading-relaxed">
-                        {process.property_address || "Não informado"}
-                      </p>
-                    </div>
+          <div className="overflow-x-auto">
+            <div className="grid grid-cols-8 gap-4 min-w-[1400px]">
+              {[
+                { key: "upload", name: "Upload do Contrato", slaDays: 1, color: "bg-blue-50 border-blue-200" },
+                { key: "solicitacao_engenharia", name: "Solicitação Engenharia", slaDays: 2, color: "bg-purple-50 border-purple-200" },
+                { key: "envio_boleto_cliente", name: "Envio de Boleto", slaDays: 1, color: "bg-orange-50 border-orange-200" },
+                { key: "laudo", name: "Laudo", slaDays: 5, color: "bg-green-50 border-green-200" },
+                { key: "signature", name: "Assinatura Bancária", slaDays: 3, color: "bg-indigo-50 border-indigo-200" },
+                { key: "itbi", name: "Recolhimento do ITBI", slaDays: 7, color: "bg-red-50 border-red-200" },
+                { key: "registry", name: "Entrada cartório para registro", slaDays: 10, color: "bg-yellow-50 border-yellow-200" },
+                { key: "delivery", name: "Entrega de chaves", slaDays: 2, color: "bg-emerald-50 border-emerald-200" },
+              ].map((column) => {
+                // LÓGICA CRÍTICA: Encontrar primeira etapa pendente
+                const columnProcesses = filteredProcesses.filter(process => {
+                  const stepOrder = [
+                    "upload", "solicitacao_engenharia", "envio_boleto_cliente", 
+                    "laudo", "signature", "itbi", "registry", "delivery"
+                  ];
+                  
+                  // Se todas estiverem concluídas, vai para entrega
+                  if (process.status_steps.delivery) return column.key === "delivery";
+                  
+                  // Encontra primeira etapa pendente
+                  for (const stepKey of stepOrder) {
+                    if (!process.status_steps[stepKey as keyof Process["status_steps"]]) {
+                      return stepKey === column.key;
+                    }
+                  }
+                  return column.key === "delivery";
+                });
 
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
-                        Valor
-                      </p>
-                      <p className="text-lg font-bold text-[#d4a574]">
-                        {process.property_value ? formatCurrency(process.property_value) : "Não informado"}
-                      </p>
-                    </div>
+                // LÓGICA SLA: Calcular dias corridos e verificar atraso
+                const getDaysInCurrentStep = (process: Process) => {
+                  const currentStep = column.key;
+                  
+                  if (currentStep === "upload") {
+                    return Math.floor((Date.now() - new Date(process.created_at).getTime()) / (1000 * 60 * 60 * 24));
+                  }
+                  
+                  return Math.floor((Date.now() - new Date(process.created_at).getTime()) / (1000 * 60 * 60 * 24));
+                };
 
-                    {process.contract_filename && (
-                      <div className="space-y-2">
-                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
-                          Contrato
-                        </p>
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm text-slate-600 flex items-center gap-2">
-                            <FileText className="h-4 w-4" />
-                            {process.contract_filename}
-                          </p>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => process.contract_url && downloadContract(process.contract_url, process.contract_filename)}
-                            className="gap-2 flex-shrink-0"
-                          >
-                            <Download className="h-3 w-3" />
-                            Baixar
-                          </Button>
+                const overdueCount = columnProcesses.filter(p => {
+                  const daysInStep = getDaysInCurrentStep(p);
+                  return daysInStep > column.slaDays;
+                }).length;
+                
+                return (
+                  <div key={column.key} className={`${column.color} rounded-lg border min-h-[600px] flex flex-col`}>
+                    {/* Header da Coluna */}
+                    <div className="p-4 border-b border-current border-opacity-20">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="font-semibold text-sm text-slate-800">{column.name}</h3>
+                        <div className="flex items-center gap-2">
+                          {overdueCount > 0 && (
+                            <div className="flex items-center text-red-600">
+                              <AlertTriangle className="h-3 w-3 mr-1" />
+                              <span className="text-xs font-bold">{overdueCount}</span>
+                            </div>
+                          )}
+                          <span className="bg-white bg-opacity-70 px-2 py-1 rounded-full text-xs font-medium text-slate-700">
+                            {columnProcesses.length}
+                          </span>
                         </div>
                       </div>
-                    )}
-
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                      {getStatusBadge(process.status, stepsCompleted, totalSteps)}
-                      <span className="text-xs text-slate-500">
-                        Criado em {new Date(process.created_at).toLocaleDateString("pt-BR")}
-                      </span>
+                      <div className="flex items-center text-xs text-slate-600">
+                        <Clock className="h-3 w-3 mr-1" />
+                        SLA: {column.slaDays} dias
+                      </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button
-                        className="w-full bg-[#d4a574] hover:bg-[#c49564] text-[#302521] gap-2"
-                        onClick={() => handleOpenSheet(process.id, false)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                        Editar Processo
-                      </Button>
-                      <Button
-                        className="w-full gap-2"
-                        variant="outline"
-                        onClick={() => handleOpenSheet(process.id, true)}
-                      >
-                        <Eye className="h-4 w-4" />
-                        Ver Status
-                      </Button>
+                    {/* Lista de Processos - APENAS NOMES */}
+                    <div className="flex-1 p-3 space-y-2 overflow-y-auto">
+                      {columnProcesses.map((process) => {
+                        const daysInStep = getDaysInCurrentStep(process);
+                        const isOverdue = daysInStep > column.slaDays;
+                        
+                        return (
+                          <div
+                            key={process.id}
+                            className="group cursor-pointer hover:bg-white hover:shadow-md rounded-lg p-3 transition-all duration-200"
+                            onClick={() => handleOpenSheet(process.id, false)}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1 min-w-0">
+                                {/* APENAS NOME DO CLIENTE COM ALERTA VERMELHO */}
+                                <p className={`text-sm font-medium truncate ${
+                                  isOverdue 
+                                    ? 'text-red-600 font-bold' 
+                                    : 'text-slate-900'
+                                }`}>
+                                  {process.client_name}
+                                </p>
+                                <div className="flex items-center mt-1 space-x-2">
+                                  <span className="text-xs text-slate-500">
+                                    {process.property_address?.split(',')[0] || 'Sem endereço'}
+                                  </span>
+                                  {isOverdue && (
+                                    <div className="flex items-center text-red-600">
+                                      <AlertTriangle className="h-3 w-3 mr-1" />
+                                      <span className="text-xs font-medium">
+                                        {daysInStep}d
+                                      </span>
+                                    </div>
+                                  )}
+                                  {!isOverdue && column.slaDays > 0 && (
+                                    <span className="text-xs text-slate-400">
+                                      {daysInStep}d
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Indicadores mínimos */}
+                            <div className="flex items-center mt-2 space-x-3 text-xs text-slate-500">
+                              {process.property_value && (
+                                <div className="flex items-center">
+                                  R$ {formatCurrency(process.property_value).split(',')[0]}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      
+                      {columnProcesses.length === 0 && (
+                        <div className="text-center py-8 text-slate-400">
+                          <FileText className="w-6 h-6 mx-auto mb-2 opacity-50" />
+                          <p className="text-xs">Nenhum processo</p>
+                        </div>
+                      )}
                     </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 
