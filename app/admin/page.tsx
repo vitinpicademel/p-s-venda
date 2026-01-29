@@ -1228,22 +1228,23 @@ export default function AdminPage() {
                         return (
                           <div
                             key={process.id}
-                            className={`group cursor-pointer bg-white border border-stone-100 rounded-lg shadow-[0_4px_20px_-2px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_30px_-2px_rgba(0,0,0,0.08)] transition-all duration-300 p-4 ${
+                            title={process.client_name} // Tooltip nativo com nome completo
+                            className={`group cursor-pointer rounded-lg shadow-[0_4px_20px_-2px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_30px_-2px_rgba(0,0,0,0.08)] transition-all duration-300 p-4 ${
                               isOverdue 
-                                ? 'border-l-4 border-l-red-800' 
-                                : 'border-l-4 border-l-amber-400'
+                                ? 'bg-red-100 text-red-900 border border-red-300' // Card todo vermelho suave
+                                : 'bg-white text-stone-800 border border-stone-200' // Card padrão
                             }`}
                             onClick={() => handleOpenSheet(process.id, false)}
                           >
-                            <div className="flex items-center justify-between">
-                              <div className="flex-1 min-w-0">
-                                {/* NOME DO CLIENTE - TIPOGRAFIA EXECUTIVA */}
-                                <p className="text-sm font-medium text-stone-800 truncate pr-3">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1 min-w-0 pr-3">
+                                {/* Nome do Cliente com quebra inteligente e tipografia refinada */}
+                                <p className="text-xs font-medium leading-tight line-clamp-2">
                                   {process.client_name}
                                 </p>
                               </div>
                               {isOverdue && (
-                                <AlertTriangle className="h-4 w-4 text-red-600 flex-shrink-0 opacity-70" />
+                                <AlertTriangle className="h-4 w-4 text-red-600 flex-shrink-0 opacity-70 mt-0.5" />
                               )}
                             </div>
                           </div>
