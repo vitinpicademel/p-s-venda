@@ -51,16 +51,16 @@
 }
 
 @layer utilities {
-  /* Scrollbar Nobre e Sutil - Estilo Executivo */
+  /* Scrollbar Minimalista Elegante - Estilo Executivo Premium */
   .scrollbar-luxury {
     /* Firefox */
     scrollbar-width: thin;
-    scrollbar-color: rgba(203, 213, 225, 0.3) transparent;
+    scrollbar-color: rgba(214, 211, 209, 0.3) transparent;
   }
   
   .scrollbar-luxury::-webkit-scrollbar {
-    height: 6px;
-    width: 6px;
+    height: 4px;
+    width: 4px;
   }
   
   .scrollbar-luxury::-webkit-scrollbar-track {
@@ -68,13 +68,13 @@
   }
   
   .scrollbar-luxury::-webkit-scrollbar-thumb {
-    background: rgba(203, 213, 225, 0.4);
-    border-radius: 3px;
-    transition: background 0.3s ease;
+    background-color: #D6D3D1; /* Stone-300 - Taupe Claro */
+    border-radius: 99px;
+    transition: background-color 0.2s ease;
   }
   
   .scrollbar-luxury::-webkit-scrollbar-thumb:hover {
-    background: rgba(203, 213, 225, 0.6);
+    background-color: #E7E5E4; /* Stone-200 - Mais claro no hover */
   }
 
   /* Scrollbar Oculta - Backup para elementos específicos */
