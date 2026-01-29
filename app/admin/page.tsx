@@ -1217,8 +1217,8 @@ export default function AdminPage() {
                       </div>
                     </div>
 
-                    {/* Lista de Processos - CARDS DE LUXO COM SCROLL OCULTO */}
-                    <div className="flex-1 space-y-3 overflow-y-auto scrollbar-hide">
+                    {/* Lista de Processos - CARDS DE LUXO COM SCROLL NOBRE */}
+                    <div className="flex-1 space-y-3 overflow-y-auto scrollbar-luxury">
                       {columnProcesses.map((process) => {
                         const daysInStep = getDaysInCurrentStep(process);
                         const isOverdue = daysInStep > column.slaDays;

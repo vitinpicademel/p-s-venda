@@ -51,7 +51,33 @@
 }
 
 @layer utilities {
-  /* Scrollbar Oculta - Estilo Executivo */
+  /* Scrollbar Nobre e Sutil - Estilo Executivo */
+  .scrollbar-luxury {
+    /* Firefox */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(203, 213, 225, 0.3) transparent;
+  }
+  
+  .scrollbar-luxury::-webkit-scrollbar {
+    height: 6px;
+    width: 6px;
+  }
+  
+  .scrollbar-luxury::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .scrollbar-luxury::-webkit-scrollbar-thumb {
+    background: rgba(203, 213, 225, 0.4);
+    border-radius: 3px;
+    transition: background 0.3s ease;
+  }
+  
+  .scrollbar-luxury::-webkit-scrollbar-thumb:hover {
+    background: rgba(203, 213, 225, 0.6);
+  }
+
+  /* Scrollbar Oculta - Backup para elementos específicos */
   .scrollbar-hide {
     -ms-overflow-style: none;  /* Internet Explorer 10+ */
     scrollbar-width: none;  /* Firefox */
