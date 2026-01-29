@@ -1137,23 +1137,20 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* Kanban Board */}
-        {isLoading ? (
-          <div className="text-center py-12">
-            <p className="text-slate-500">Carregando processos...</p>
-          </div>
-        ) : (
+        {/* Seção Superior - Kanban Compacto */}
+        <div className="mb-8">
+          <h2 className="text-xl font-bold text-slate-800 mb-4">Visão Geral - Fluxo de Processos</h2>
           <div className="overflow-x-auto bg-gray-50 rounded-lg p-4">
-            <div className="grid grid-cols-8 gap-4 min-w-[1400px] h-[calc(100vh-200px)]">
+            <div className="grid grid-cols-8 gap-4 min-w-[1400px] max-h-[300px]">
               {[
-                { key: "upload", name: "Upload do Contrato", slaDays: 1, color: "bg-blue-100 border-blue-200" },
-                { key: "solicitacao_engenharia", name: "Solicitação Engenharia", slaDays: 2, color: "bg-purple-100 border-purple-200" },
-                { key: "envio_boleto_cliente", name: "Envio de Boleto", slaDays: 1, color: "bg-orange-100 border-orange-200" },
+                { key: "upload", name: "Upload", slaDays: 1, color: "bg-blue-100 border-blue-200" },
+                { key: "solicitacao_engenharia", name: "Engenharia", slaDays: 2, color: "bg-purple-100 border-purple-200" },
+                { key: "envio_boleto_cliente", name: "Boleto", slaDays: 1, color: "bg-orange-100 border-orange-200" },
                 { key: "laudo", name: "Laudo", slaDays: 5, color: "bg-green-100 border-green-200" },
-                { key: "signature", name: "Assinatura Bancária", slaDays: 3, color: "bg-indigo-100 border-indigo-200" },
-                { key: "itbi", name: "Recolhimento do ITBI", slaDays: 7, color: "bg-red-100 border-red-200" },
-                { key: "registry", name: "Entrada cartório para registro", slaDays: 10, color: "bg-yellow-100 border-yellow-200" },
-                { key: "delivery", name: "Entrega de chaves", slaDays: 2, color: "bg-emerald-100 border-emerald-200" },
+                { key: "signature", name: "Assinatura", slaDays: 3, color: "bg-indigo-100 border-indigo-200" },
+                { key: "itbi", name: "ITBI", slaDays: 7, color: "bg-red-100 border-red-200" },
+                { key: "registry", name: "Cartório", slaDays: 10, color: "bg-yellow-100 border-yellow-200" },
+                { key: "delivery", name: "Entrega", slaDays: 2, color: "bg-emerald-100 border-emerald-200" },
               ].map((column) => {
                 // LÓGICA CRÍTICA: Encontrar primeira etapa pendente
                 const columnProcesses = filteredProcesses.filter(process => {
@@ -1192,30 +1189,30 @@ export default function AdminPage() {
                 
                 return (
                   <div key={column.key} className={`${column.color} rounded-lg border min-h-0 flex flex-col`}>
-                    {/* Header da Coluna */}
-                    <div className="p-3 border-b border-current border-opacity-20 flex-shrink-0">
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="font-semibold text-sm text-slate-800">{column.name}</h3>
-                        <div className="flex items-center gap-2">
+                    {/* Header Compacto da Coluna */}
+                    <div className="p-2 border-b border-current border-opacity-20 flex-shrink-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <h3 className="font-semibold text-xs text-slate-800">{column.name}</h3>
+                        <div className="flex items-center gap-1">
                           {overdueCount > 0 && (
                             <div className="flex items-center text-red-600">
                               <AlertTriangle className="h-3 w-3 mr-1" />
                               <span className="text-xs font-bold">{overdueCount}</span>
                             </div>
                           )}
-                          <span className="bg-white bg-opacity-70 px-2 py-1 rounded-full text-xs font-medium text-slate-700">
+                          <span className="bg-white bg-opacity-70 px-1 py-0.5 rounded-full text-xs font-medium text-slate-700">
                             {columnProcesses.length}
                           </span>
                         </div>
                       </div>
                       <div className="flex items-center text-xs text-slate-600">
-                        <Clock className="h-3 w-3 mr-1" />
-                        SLA: {column.slaDays}d
+                        <Clock className="h-2 w-2 mr-1" />
+                        {column.slaDays}d
                       </div>
                     </div>
 
-                    {/* Lista de Processos - CARDS BRANCOS COM SCROLL */}
-                    <div className="flex-1 p-3 space-y-2 overflow-y-auto">
+                    {/* Lista de Processos - MINI-CARDS COM SCROLL */}
+                    <div className="flex-1 p-2 space-y-1 overflow-y-auto">
                       {columnProcesses.map((process) => {
                         const daysInStep = getDaysInCurrentStep(process);
                         const isOverdue = daysInStep > column.slaDays;
@@ -1223,20 +1220,22 @@ export default function AdminPage() {
                         return (
                           <div
                             key={process.id}
-                            className={`group cursor-pointer bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200 p-3 border ${
-                              isOverdue ? 'border-red-400 border-l-4' : 'border-gray-200'
+                            className={`group cursor-pointer bg-white rounded shadow-sm hover:shadow transition-all duration-200 p-2 border ${
+                              isOverdue ? 'border-red-400 border-l-2' : 'border-gray-200'
                             }`}
                             onClick={() => handleOpenSheet(process.id, false)}
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex-1 min-w-0">
-                                {/* APENAS NOME DO CLIENTE EM NEGRITO */}
-                                <p className="text-sm font-bold text-slate-900 truncate pr-2">
+                                {/* APENAS NOME DO CLIENTE */}
+                                <p className={`text-xs font-medium truncate pr-1 ${
+                                  isOverdue ? 'text-red-600 font-bold' : 'text-slate-900'
+                                }`}>
                                   {process.client_name}
                                 </p>
                               </div>
                               {isOverdue && (
-                                <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0" />
+                                <AlertTriangle className="h-3 w-3 text-red-500 flex-shrink-0" />
                               )}
                             </div>
                           </div>
@@ -1244,9 +1243,8 @@ export default function AdminPage() {
                       })}
                       
                       {columnProcesses.length === 0 && (
-                        <div className="text-center py-8 text-slate-400">
-                          <FileText className="w-6 h-6 mx-auto mb-2 opacity-50" />
-                          <p className="text-xs">Nenhum processo</p>
+                        <div className="text-center py-4 text-slate-400">
+                          <p className="text-xs">-</p>
                         </div>
                       )}
                     </div>
@@ -1255,7 +1253,117 @@ export default function AdminPage() {
               })}
             </div>
           </div>
-        )}
+        </div>
+
+        {/* Divisória */}
+        <hr className="my-8 border-gray-300" />
+
+        {/* Seção Inferior - Lista Detalhada */}
+        <div>
+          <h2 className="text-xl font-bold text-slate-800 mb-4">Detalhamento dos Processos</h2>
+          
+          {/* Cards Grid - COMPONENTE ANTIGO RESTAURADO */}
+          {isLoading ? (
+            <div className="text-center py-12">
+              <p className="text-slate-500">Carregando processos...</p>
+            </div>
+          ) : (
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {filteredProcesses.map((process) => {
+                const stepsCompleted = getStepsCompleted(process.status_steps);
+                const totalSteps = 6; // solicitacao_engenharia, envio_boleto_cliente, laudo, signature, itbi, registry
+                
+                return (
+                  <Card
+                    key={process.id}
+                    className="hover:shadow-lg transition-shadow duration-200 border-slate-200"
+                  >
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <CardTitle className="text-lg font-semibold text-slate-800 mb-1">
+                            {process.client_name}
+                          </CardTitle>
+                          <CardDescription className="text-sm text-slate-600">
+                            {process.client_email}
+                          </CardDescription>
+                        </div>
+                        <FileText className="h-5 w-5 text-[#d4a574]" />
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+                          Imóvel
+                        </p>
+                        <p className="text-sm text-slate-700 leading-relaxed">
+                          {process.property_address || "Não informado"}
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+                          Valor
+                        </p>
+                        <p className="text-lg font-bold text-[#d4a574]">
+                          {process.property_value ? formatCurrency(process.property_value) : "Não informado"}
+                        </p>
+                      </div>
+
+                      {process.contract_filename && (
+                        <div className="space-y-2">
+                          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+                            Contrato
+                          </p>
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm text-slate-600 flex items-center gap-2">
+                              <FileText className="h-4 w-4" />
+                              {process.contract_filename}
+                            </p>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => process.contract_url && downloadContract(process.contract_url, process.contract_filename)}
+                              className="gap-2 flex-shrink-0"
+                            >
+                              <Download className="h-3 w-3" />
+                              Baixar
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                        {getStatusBadge(process.status, stepsCompleted, totalSteps)}
+                        <span className="text-xs text-slate-500">
+                          Criado em {new Date(process.created_at).toLocaleDateString("pt-BR")}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          className="w-full bg-[#d4a574] hover:bg-[#c49564] text-[#302521] gap-2"
+                          onClick={() => handleOpenSheet(process.id, false)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                          Editar Processo
+                        </Button>
+                        <Button
+                          className="w-full gap-2"
+                          variant="outline"
+                          onClick={() => handleOpenSheet(process.id, true)}
+                        >
+                          <Eye className="h-4 w-4" />
+                          Ver Status
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
         {/* Empty State */}
         {!isLoading && filteredProcesses.length === 0 && (
