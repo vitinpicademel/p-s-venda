@@ -1192,7 +1192,9 @@ export default function AdminPage() {
                 }).length;
                 
                 return (
-                  <div key={column.key} className="min-h-0 flex flex-col">
+                  <div key={column.key} className={`min-h-0 flex flex-col ${
+                    column.key !== 'delivery' ? 'border-r border-stone-200 pr-4' : 'pl-4'
+                  }`}>
                     {/* Header Executivo */}
                     <div className="pb-3 mb-3 border-b border-stone-100 flex-shrink-0">
                       <div className="flex items-center justify-between mb-2">
