@@ -1144,7 +1144,7 @@ export default function AdminPage() {
             <div className="text-xs font-medium tracking-widest text-stone-500">Fluxo de Processos</div>
           </div>
           
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto noble-scroll">
             <div className="grid grid-cols-8 gap-8 min-w-[1600px] max-h-[320px]">
               {[
                 { key: "upload", name: "Upload", slaDays: 1 },
@@ -1219,8 +1219,8 @@ export default function AdminPage() {
                       </div>
                     </div>
 
-                    {/* Lista de Processos - CARDS DE LUXO COM SCROLL NOBRE */}
-                    <div className="flex-1 space-y-3 overflow-y-auto scrollbar-luxury">
+                    {/* Lista de Processos - CARDS DE LUXO COM SCROLL NUCLEAR */}
+                    <div className="flex-1 space-y-3 overflow-y-auto noble-scroll">
                       {columnProcesses.map((process) => {
                         const daysInStep = getDaysInCurrentStep(process);
                         const isOverdue = daysInStep > column.slaDays;
