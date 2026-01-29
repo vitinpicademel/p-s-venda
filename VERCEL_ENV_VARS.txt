@@ -1,0 +1,25 @@
+# ============================================
+# VARIÁVEIS DE AMBIENTE PARA CONFIGURAR NA VERCEL
+# ============================================
+# 
+# INSTRUÇÕES:
+# 1. Acesse: https://vercel.com → Seu Projeto → Settings → Environment Variables
+# 2. Adicione CADA variável abaixo (copie e cole)
+# 3. Marque para: Production, Preview E Development
+# 4. Faça um Redeploy
+#
+# ============================================
+
+# Variável 1:
+NEXT_PUBLIC_SUPABASE_URL=https://qpjusjbldxttmxmdatxu.supabase.co
+
+# Variável 2:
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFwanVzamJsZHh0dG14bWRhdHh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzM2MjU0NDAsImV4cCI6MjA0OTIwMTQ0MH0.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# ============================================
+# IMPORTANTE:
+# - Substitua os valores acima pelos valores REAIS do seu Supabase
+# - Obtenha em: https://app.supabase.com → Settings → API
+# - NÃO adicione aspas ou espaços extras
+# ============================================
+
