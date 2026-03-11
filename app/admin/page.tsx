@@ -58,6 +58,7 @@ import { useRouter } from "next/navigation";
 import ProcessDocumentsList from "@/components/ProcessDocumentsList";
 import ProcessHistory from "@/components/ProcessHistory";
 import Step1Upload from "@/components/Step1Upload";
+import { Select } from "@/components/ui/select-shadcn";
 
 // Configuração das etapas do processo
 const stepsConfig = [
@@ -82,6 +83,7 @@ type Process = {
   observations: string | null;
   contract_url: string | null;
   contract_filename: string | null;
+  correspondent: string | null;
   status_steps: {
     etapa1_ficha_planilha: boolean;
     etapa2_emissao_contrato: boolean;
@@ -1500,6 +1502,19 @@ export default function AdminPage() {
                           <SheetTitle className="text-2xl text-slate-800 flex items-center justify-between">
                             <span>{selectedProcess.client_name}</span>
                             <div className="flex items-center gap-2">
+                              <Select
+                                value={selectedProcess.correspondent || ""}
+                                onChange={(e) => {
+                                  // TODO: Implementar função de atualização
+                                  console.log("Correspondent changed:", e.target.value);
+                                }}
+                                className="w-32"
+                              >
+                                <option value="">Não definido</option>
+                                <option value="REM">REM</option>
+                                <option value="Euripedes">Euripedes</option>
+                                <option value="Outro">Outro</option>
+                              </Select>
                               {isReadOnlyView && (
                                 <span className="px-2 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
                                   Modo Visualização
