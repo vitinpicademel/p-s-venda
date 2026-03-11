@@ -1382,6 +1382,15 @@ export default function AdminPage() {
                         </p>
                       </div>
 
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+                          CORRESP/CARTÓRIO
+                        </p>
+                        <p className="text-lg font-bold text-[#d4a574]">
+                          {process.correspondent || "Não definido"}
+                        </p>
+                      </div>
+
                       {process.contract_filename && (
                         <div className="space-y-2">
                           <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
