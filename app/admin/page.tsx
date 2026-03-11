@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Select } from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -160,6 +161,47 @@ export default function AdminPage() {
   const [observationsText, setObservationsText] = useState("");
   const [isSavingObservations, setIsSavingObservations] = useState(false);
   const [saveObservationsStatus, setSaveObservationsStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+
+  // Atualizar correspondente
+  const handleUpdateCorrespondent = async (processId: string, correspondent: string) => {
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+
+    try {
+      const { error } = await supabase
+        .from("processes")
+        .update({ correspondent })
+        .eq("id", processId);
+
+      if (error) throw error;
+
+      // Atualizar estado local
+      setProcesses((prev) =>
+        prev.map((p) =>
+          p.id === processId ? { ...p, correspondent } : p
+        )
+      );
+
+      setFilteredProcesses((prev) =>
+        prev.map((p) =>
+          p.id === processId ? { ...p, correspondent } : p
+        )
+      );
+
+      showToast({
+        title: "Sucesso",
+        description: "Correspondente atualizado com sucesso!",
+        type: "success",
+      });
+    } catch (error) {
+      console.error("Erro ao atualizar correspondente:", error);
+      showToast({
+        title: "Erro",
+        description: "Não foi possível atualizar o correspondente.",
+        type: "error",
+      });
+    }
+  };
 
   // Buscar processos do Supabase
   useEffect(() => {
@@ -1348,6 +1390,15 @@ export default function AdminPage() {
                         </p>
                       </div>
 
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+                          Corresp/Cartório
+                        </p>
+                        <p className="text-lg font-bold text-[#d4a574]">
+                          {process.correspondent || "Não definido"}
+                        </p>
+                      </div>
+
                       {process.contract_filename && (
                         <div className="space-y-2">
                           <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
@@ -1502,43 +1553,6 @@ export default function AdminPage() {
                               <XCircle className="h-4 w-4" />
                               Cancelar
                             </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          <SheetTitle className="text-2xl text-slate-800 flex items-center justify-between">
-                            <span>{selectedProcess.client_name}</span>
-                            <div className="flex items-center gap-2">
-                              {isReadOnlyView && (
-                                <span className="px-2 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
-                                  Modo Visualização
-                                </span>
-                              )}
-                              {!isReadOnlyView && (
-                                <Button
-                                  onClick={handleStartEdit}
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-[#d4a574] hover:text-[#c49564] hover:bg-amber-50"
-                                  title="Editar nome e endereço"
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
-                          </SheetTitle>
-                          <SheetDescription className="text-base text-slate-600">
-                            {selectedProcess.property_address || "Endereço não informado"}
-                          </SheetDescription>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </SheetHeader>
-
-                <div className="flex-1 min-h-0 overflow-y-auto mt-6 space-y-6 pr-2">
-                  {/* Barra de Progresso */}
-                  <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium text-slate-700">Progresso Geral</span>
                       <span className="text-sm font-semibold text-[#d4a574]">
