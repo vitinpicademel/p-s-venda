@@ -124,7 +124,7 @@ export default function SetupUsersPage() {
 
               <div className="mt-4 p-3 bg-blue-50 rounded">
                 <p className="text-sm text-blue-800">
-                  <strong>Próximo passo:</strong> Verifique se os usuários conseguem fazer login com a senha "Donna.123"
+                  <strong>Próximo passo:</strong> Verifique se os usuários conseguem fazer login com a senha &quot;Donna.123&quot;
                 </p>
               </div>
             </div>
