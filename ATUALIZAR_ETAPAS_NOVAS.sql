@@ -127,7 +127,9 @@ CREATE POLICY "Clients can view step documents of their processes"
     EXISTS (
       SELECT 1 FROM processes
       WHERE processes.id = step_documents.process_id
-        AND processes.client_id = auth.uid()
+        AND processes.client_email = (
+          SELECT email FROM profiles WHERE id = auth.uid()
+        )
     )
   );
 
@@ -168,7 +170,10 @@ CREATE POLICY "Users can view their own step documents"
         AND EXISTS (
           SELECT 1 FROM processes
           WHERE processes.id = step_documents.process_id
-            AND (processes.client_id = auth.uid() OR processes.admin_id = auth.uid())
+            AND (
+              processes.client_email = (SELECT email FROM profiles WHERE id = auth.uid())
+              OR processes.admin_id = auth.uid()
+            )
         )
     )
   );

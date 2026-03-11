@@ -36,7 +36,6 @@ export type ProcessStep = {
   updated_at: string;
 };
 
-<<<<<<< HEAD
 export type StepDocument = {
   id: string;
   process_id: string;
@@ -49,8 +48,6 @@ export type StepDocument = {
   created_at: string;
 };
 
-=======
->>>>>>> 664e8af71e074fa9f2bb1914106cf0612d815f7e
 export type ProcessWithSteps = Process & {
   steps: ProcessStep[];
 };

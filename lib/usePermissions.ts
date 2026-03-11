@@ -88,6 +88,32 @@ export function usePermissions(userRole: UserRole | null | undefined) {
 
 // Função utilitária para uso fora de componentes React
 export function checkPermissions(userRole: UserRole | null | undefined) {
-  const permissions = usePermissions(userRole);
+  const permissions = {
+    hasEditPermission: () => userRole === 'admin',
+    canCreateProcess: () => userRole === 'admin',
+    canEditProcess: () => userRole === 'admin',
+    canToggleSteps: () => userRole === 'admin',
+    canUploadFiles: () => userRole === 'admin',
+    canViewAllProcesses: () => userRole !== null && userRole !== 'client',
+    isClient: () => userRole === 'client',
+    isAdmin: () => userRole === 'admin',
+    isReadOnly: () => userRole != null && ['secretaria', 'financeiro', 'administrativo', 'gestor'].includes(userRole as string),
+    getRoleDisplayName: () => {
+      if (!userRole) return 'Desconhecido';
+      
+      const roleNames = {
+        admin: 'Administrador',
+        client: 'Cliente',
+        secretaria: 'Secretaria',
+        financeiro: 'Financeiro',
+        administrativo: 'Administrativo',
+        gestor: 'Gestor'
+      };
+      
+      return roleNames[userRole] || 'Desconhecido';
+    },
+    userRole
+  };
+  
   return permissions;
 }
