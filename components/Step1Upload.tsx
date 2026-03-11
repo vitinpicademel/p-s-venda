@@ -44,8 +44,8 @@ export default function Step1Upload({ processId, isCompleted, onToggle, disabled
       if (error) throw error;
 
       if (data) {
-        const ficha = data.find(doc => doc.document_type === 'ficha');
-        const planilha = data.find(doc => doc.document_type === 'planilha');
+        const ficha = data.find((doc: StepDocument) => doc.document_type === 'ficha');
+        const planilha = data.find((doc: StepDocument) => doc.document_type === 'planilha');
         
         setFichaUploaded(ficha || null);
         setPlanilhaUploaded(planilha || null);
@@ -125,7 +125,7 @@ export default function Step1Upload({ processId, isCompleted, onToggle, disabled
       return `${type}_${timestamp}_${random}${extension}`;
     };
 
-    const sanitizedFileName = sanitizeFileName(file, type);
+    const sanitizedFileName = sanitizeFileName(file.name, type);
     const filePath = `step-documents/${processId}/step1/${sanitizedFileName}`;
 
     // Upload para storage
@@ -271,7 +271,7 @@ export default function Step1Upload({ processId, isCompleted, onToggle, disabled
               <CheckCircle2 className="h-5 w-5 text-green-600" />
             )}
             <Switch
-              checked={isStepCompleted}
+              checked={!!isStepCompleted}
               onCheckedChange={() => {
                 if (!disabled && isStepCompleted) {
                   onToggle(false);

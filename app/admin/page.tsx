@@ -1579,6 +1579,7 @@ export default function AdminPage() {
                         if (stepConfig.key === "etapa1_ficha_planilha") {
                           return (
                             <Step1Upload
+                              key={stepConfig.key}
                               processId={selectedProcess.id}
                               isCompleted={selectedProcess.status_steps[stepConfig.key]}
                               onToggle={(completed) => !isReadOnlyView && handleStepToggle(selectedProcess.id, stepConfig.key)}
