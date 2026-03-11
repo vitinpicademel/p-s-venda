@@ -51,6 +51,7 @@ import {
   FileSignature,
   Receipt,
   AlertTriangle,
+  Loader2,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { logHelpers } from "@/lib/process-logs";
@@ -1191,16 +1192,23 @@ export default function AdminPage() {
                   >
                     Cancelar
                   </Button>
-                  {/* Botão Criar Processo - visível apenas para roles permitidas */}
-                  {permissions.canCreateProcess() && (
-                    <Button
-                      onClick={() => setIsDialogOpen(true)}
-                      className="bg-[#d4a574] hover:bg-[#c49564] text-white"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Criar Processo
-                    </Button>
-                  )}
+                  <Button
+                    type="submit"
+                    disabled={isUploading}
+                    className="bg-[#d4a574] hover:bg-[#c49564] text-white"
+                  >
+                    {isUploading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Criando...
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Criar Processo
+                      </>
+                    )}
+                  </Button>
                 </DialogFooter>
               </form>
             </DialogContent>
