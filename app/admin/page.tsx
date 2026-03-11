@@ -57,19 +57,17 @@ import { logHelpers } from "@/lib/process-logs";
 import { useRouter } from "next/navigation";
 import ProcessDocumentsList from "@/components/ProcessDocumentsList";
 import ProcessHistory from "@/components/ProcessHistory";
-import Step1Upload from "@/components/Step1Upload";
 
 // Configuração das etapas do processo
 const stepsConfig = [
-  { key: "etapa1_ficha_planilha" as const, name: "Ficha de contrato e Planilha de Cálculo", description: "Upload da ficha de contrato e planilha de cálculo", icon: FileText },
-  { key: "etapa2_emissao_contrato" as const, name: "Emissão do contrato", description: "Elaboração e emissão do contrato de venda", icon: FileText },
-  { key: "etapa3_validacao_juridico" as const, name: "Validação do jurídico", description: "Análise e validação jurídica do contrato", icon: FileCheck },
-  { key: "etapa4_assinaturas_contrato" as const, name: "Assinaturas do contrato", description: "Assinatura das partes contratantes", icon: FileSignature },
-  { key: "etapa5_solicitacao_engenharia" as const, name: "Solicitação Engenharia", description: "Solicitação de vistoria enviada ao banco", icon: ClipboardList },
-  { key: "etapa6_assinatura_bancario" as const, name: "Assinatura do contrato bancário", description: "Assinatura do contrato de financiamento", icon: FileSignature },
-  { key: "etapa7_itbi" as const, name: "Recolhimento de ITBI", description: "Pagamento do Imposto sobre Transmissão de Bens Imóveis", icon: Receipt },
-  { key: "etapa8_cartorio_registro" as const, name: "Entrada cartório para registro", description: "Registro da escritura no cartório", icon: ScrollText },
-  { key: "etapa9_entrega_chaves" as const, name: "Entrega de Chaves", description: "Entrega das chaves e conclusão do processo", icon: KeyRound },
+  { key: "upload" as const, name: "Upload do Contrato", description: "Contrato PDF enviado pela imobiliária", icon: FileText },
+  { key: "solicitacao_engenharia" as const, name: "Solicitação Engenharia", description: "Solicitação de vistoria enviada ao banco", icon: ClipboardList },
+  { key: "envio_boleto_cliente" as const, name: "Envio de boleto p/ cliente", description: "Boleto da taxa de avaliação enviado", icon: Barcode },
+  { key: "laudo" as const, name: "Laudo", description: "Emissão e validação do laudo de engenharia", icon: FileCheck },
+  { key: "signature" as const, name: "Assinatura do contrato bancário", description: "Assinatura do contrato de financiamento", icon: FileSignature },
+  { key: "itbi" as const, name: "Recolhimento de ITBI", description: "Pagamento do Imposto sobre Transmissão de Bens Imóveis", icon: Receipt },
+  { key: "registry" as const, name: "Entrada cartório para registro", description: "Registro da escritura no cartório", icon: ScrollText },
+  { key: "delivery" as const, name: "Entrega de Chaves", description: "Entrega das chaves e conclusão do processo", icon: KeyRound },
 ];
 
 // Tipo para processo (do Supabase)
@@ -83,15 +81,14 @@ type Process = {
   contract_url: string | null;
   contract_filename: string | null;
   status_steps: {
-    etapa1_ficha_planilha: boolean;
-    etapa2_emissao_contrato: boolean;
-    etapa3_validacao_juridico: boolean;
-    etapa4_assinaturas_contrato: boolean;
-    etapa5_solicitacao_engenharia: boolean;
-    etapa6_assinatura_bancario: boolean;
-    etapa7_itbi: boolean;
-    etapa8_cartorio_registro: boolean;
-    etapa9_entrega_chaves: boolean;
+    upload: boolean;
+    solicitacao_engenharia: boolean;
+    envio_boleto_cliente: boolean;
+    laudo: boolean;
+    signature: boolean;
+    itbi: boolean;
+    registry: boolean;
+    delivery: boolean;
   };
   status: "in_progress" | "completed";
   created_at: string;
@@ -109,14 +106,12 @@ type ProcessStep = {
 // Função auxiliar para calcular etapas concluídas
 const getStepsCompleted = (statusSteps: Process["status_steps"]): number => {
   const steps = [
-    statusSteps.etapa1_ficha_planilha,
-    statusSteps.etapa2_emissao_contrato,
-    statusSteps.etapa3_validacao_juridico,
-    statusSteps.etapa4_assinaturas_contrato,
-    statusSteps.etapa5_solicitacao_engenharia,
-    statusSteps.etapa6_assinatura_bancario,
-    statusSteps.etapa7_itbi,
-    statusSteps.etapa8_cartorio_registro,
+    statusSteps.solicitacao_engenharia,
+    statusSteps.envio_boleto_cliente,
+    statusSteps.laudo,
+    statusSteps.signature,
+    statusSteps.itbi,
+    statusSteps.registry,
   ];
   return steps.filter(Boolean).length;
 };
@@ -196,19 +191,19 @@ export default function AdminPage() {
       if (data) {
         const normalized = (data as any[]).map((p) => {
           const steps = p.status_steps || {};
-          
+          const legacyEngineering = !!steps.engineering;
+
           return {
             ...p,
             status_steps: {
-              etapa1_ficha_planilha: !!steps.etapa1_ficha_planilha,
-              etapa2_emissao_contrato: !!steps.etapa2_emissao_contrato,
-              etapa3_validacao_juridico: !!steps.etapa3_validacao_juridico,
-              etapa4_assinaturas_contrato: !!steps.etapa4_assinaturas_contrato,
-              etapa5_solicitacao_engenharia: !!steps.etapa5_solicitacao_engenharia || !!steps.solicitacao_engenharia || !!steps.engineering,
-              etapa6_assinatura_bancario: !!steps.etapa6_assinatura_bancario || !!steps.signature,
-              etapa7_itbi: !!steps.etapa7_itbi || !!steps.itbi,
-              etapa8_cartorio_registro: !!steps.etapa8_cartorio_registro || !!steps.registry,
-              etapa9_entrega_chaves: !!steps.etapa9_entrega_chaves || !!steps.delivery,
+              upload: !!steps.upload,
+              solicitacao_engenharia: steps.solicitacao_engenharia ?? legacyEngineering,
+              envio_boleto_cliente: steps.envio_boleto_cliente ?? legacyEngineering,
+              laudo: steps.laudo ?? legacyEngineering,
+              signature: !!steps.signature,
+              itbi: !!steps.itbi,
+              registry: !!steps.registry,
+              delivery: !!steps.delivery,
             },
           };
         }) as Process[];
@@ -506,18 +501,16 @@ export default function AdminPage() {
 
     // 5. Se todas as etapas intermediárias estão concluídas, marca entrega como concluída
     const intermediateSteps = [
-      currentSteps.etapa1_ficha_planilha,
-      currentSteps.etapa2_emissao_contrato,
-      currentSteps.etapa3_validacao_juridico,
-      currentSteps.etapa4_assinaturas_contrato,
-      currentSteps.etapa5_solicitacao_engenharia,
-      currentSteps.etapa6_assinatura_bancario,
-      currentSteps.etapa7_itbi,
-      currentSteps.etapa8_cartorio_registro,
+      currentSteps.solicitacao_engenharia,
+      currentSteps.envio_boleto_cliente,
+      currentSteps.laudo,
+      currentSteps.signature,
+      currentSteps.itbi,
+      currentSteps.registry,
     ];
     const allIntermediateCompleted = intermediateSteps.every(Boolean);
     if (allIntermediateCompleted) {
-      currentSteps.etapa9_entrega_chaves = true;
+      currentSteps.delivery = true;
     }
 
     // 6. Calcula status geral
@@ -816,15 +809,14 @@ export default function AdminPage() {
           contract_url: contractUrl,
           contract_filename: contractFilename,
           status_steps: {
-            etapa1_ficha_planilha: false,
-            etapa2_emissao_contrato: false,
-            etapa3_validacao_juridico: false,
-            etapa4_assinaturas_contrato: false,
-            etapa5_solicitacao_engenharia: false,
-            etapa6_assinatura_bancario: false,
-            etapa7_itbi: false,
-            etapa8_cartorio_registro: false,
-            etapa9_entrega_chaves: false,
+            upload: true,
+            solicitacao_engenharia: false,
+            envio_boleto_cliente: false,
+            laudo: false,
+            signature: false,
+            itbi: false,
+            registry: false,
+            delivery: false,
           },
           status: "in_progress",
         })
@@ -1153,28 +1145,26 @@ export default function AdminPage() {
           </div>
           
           <div className="overflow-x-auto noble-scroll">
-            <div className="grid grid-cols-9 gap-8 min-w-[1800px] max-h-[320px]">
+            <div className="grid grid-cols-8 gap-8 min-w-[1600px] max-h-[320px]">
               {[
-                { key: "etapa1_ficha_planilha", name: "Ficha/Planilha", slaDays: 1 },
-                { key: "etapa2_emissao_contrato", name: "Emissão", slaDays: 2 },
-                { key: "etapa3_validacao_juridico", name: "Jurídico", slaDays: 1 },
-                { key: "etapa4_assinaturas_contrato", name: "Assinaturas", slaDays: 2 },
-                { key: "etapa5_solicitacao_engenharia", name: "Engenharia", slaDays: 2 },
-                { key: "etapa6_assinatura_bancario", name: "Bancário", slaDays: 3 },
-                { key: "etapa7_itbi", name: "ITBI", slaDays: 7 },
-                { key: "etapa8_cartorio_registro", name: "Cartório", slaDays: 10 },
-                { key: "etapa9_entrega_chaves", name: "Entrega", slaDays: 2 },
+                { key: "upload", name: "Upload", slaDays: 1 },
+                { key: "solicitacao_engenharia", name: "Engenharia", slaDays: 2 },
+                { key: "envio_boleto_cliente", name: "Boleto", slaDays: 1 },
+                { key: "laudo", name: "Laudo", slaDays: 5 },
+                { key: "signature", name: "Assinatura", slaDays: 3 },
+                { key: "itbi", name: "ITBI", slaDays: 7 },
+                { key: "registry", name: "Cartório", slaDays: 10 },
+                { key: "delivery", name: "Entrega", slaDays: 2 },
               ].map((column) => {
                 // LÓGICA CRÍTICA: Encontrar primeira etapa pendente
                 const columnProcesses = filteredProcesses.filter(process => {
                   const stepOrder = [
-                    "etapa1_ficha_planilha", "etapa2_emissao_contrato", "etapa3_validacao_juridico", 
-                    "etapa4_assinaturas_contrato", "etapa5_solicitacao_engenharia", "etapa6_assinatura_bancario",
-                    "etapa7_itbi", "etapa8_cartorio_registro", "etapa9_entrega_chaves"
+                    "upload", "solicitacao_engenharia", "envio_boleto_cliente", 
+                    "laudo", "signature", "itbi", "registry", "delivery"
                   ];
                   
                   // Se todas estiverem concluídas, vai para entrega
-                  if (process.status_steps.etapa9_entrega_chaves) return column.key === "etapa9_entrega_chaves";
+                  if (process.status_steps.delivery) return column.key === "delivery";
                   
                   // Encontra primeira etapa pendente
                   for (const stepKey of stepOrder) {
@@ -1182,14 +1172,14 @@ export default function AdminPage() {
                       return stepKey === column.key;
                     }
                   }
-                  return column.key === "etapa9_entrega_chaves";
+                  return column.key === "delivery";
                 });
 
                 // LÓGICA SLA: Calcular dias corridos e verificar atraso
                 const getDaysInCurrentStep = (process: Process) => {
                   const currentStep = column.key;
                   
-                  if (currentStep === "etapa1_ficha_planilha") {
+                  if (currentStep === "upload") {
                     return Math.floor((Date.now() - new Date(process.created_at).getTime()) / (1000 * 60 * 60 * 24));
                   }
                   
@@ -1434,7 +1424,7 @@ export default function AdminPage() {
             if (!selectedProcess) return null;
 
             const stepsCompleted = getStepsCompleted(selectedProcess.status_steps);
-            const totalSteps = 9;
+            const totalSteps = 6;
 
             return (
               <>
@@ -1574,24 +1564,10 @@ export default function AdminPage() {
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold text-slate-800">Etapas do Processo</h3>
                     <div className="space-y-3">
-                      {stepsConfig.map((stepConfig, index) => {
-                        // Se for a primeira etapa (etapa1_ficha_planilha), usa o componente Step1Upload
-                        if (stepConfig.key === "etapa1_ficha_planilha") {
-                          return (
-                            <Step1Upload
-                              key={stepConfig.key}
-                              processId={selectedProcess.id}
-                              isCompleted={selectedProcess.status_steps[stepConfig.key]}
-                              onToggle={(completed) => !isReadOnlyView && handleStepToggle(selectedProcess.id, stepConfig.key)}
-                              disabled={isReadOnlyView}
-                            />
-                          );
-                        }
-
-                        // Para as outras etapas, mantém o comportamento padrão
+                      {stepsConfig.map((stepConfig) => {
                         const Icon = stepConfig.icon;
                         const isCompleted = selectedProcess.status_steps[stepConfig.key];
-                        const isDisabled = isReadOnlyView;
+                        const isDisabled = stepConfig.key === "upload" || isReadOnlyView;
 
                         return (
                           <div

@@ -2,7 +2,7 @@ export type Profile = {
   id: string;
   email: string;
   full_name: string | null;
-  role: 'admin' | 'client';
+  role: 'admin' | 'client' | 'secretaria' | 'financeiro' | 'administrativo' | 'gestor';
   created_at: string;
   updated_at: string;
 };
@@ -17,6 +17,7 @@ export type Process = {
   client_email: string;
   property_address: string | null;
   property_value: number | null;
+  correspondent: string | null;
   status: 'in_progress' | 'completed';
   created_at: string;
   updated_at: string;
@@ -35,6 +36,7 @@ export type ProcessStep = {
   updated_at: string;
 };
 
+<<<<<<< HEAD
 export type StepDocument = {
   id: string;
   process_id: string;
@@ -47,6 +49,8 @@ export type StepDocument = {
   created_at: string;
 };
 
+=======
+>>>>>>> 664e8af71e074fa9f2bb1914106cf0612d815f7e
 export type ProcessWithSteps = Process & {
   steps: ProcessStep[];
 };
