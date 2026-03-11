@@ -20,13 +20,14 @@ export async function POST() {
     try {
       console.log(`📧 Criando usuário: ${user.email}`)
       
-      // Criar usuário usando o client normal
+      // Criar usuário usando o client normal com auto-confirm
       const supabase = createClient()
       
       const { data, error } = await supabase.auth.signUp({
         email: user.email,
         password: defaultPassword,
         options: {
+          emailRedirectTo: undefined,
           data: {
             role: user.role
           }
@@ -35,11 +36,25 @@ export async function POST() {
 
       if (error) {
         if (error.message.includes('already registered')) {
-          results.push({
+          // Tentar fazer login para ver se o usuário já existe e está ativo
+          const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
             email: user.email,
-            status: 'exists',
-            message: 'Usuário já existe. Verifique se tem role secretaria.'
+            password: defaultPassword
           })
+          
+          if (!loginError && loginData.user) {
+            results.push({
+              email: user.email,
+              status: 'already_active',
+              message: 'Usuário já existe e está ativo! Pode fazer login.'
+            })
+          } else {
+            results.push({
+              email: user.email,
+              status: 'exists_but_inactive',
+              message: 'Usuário existe mas precisa confirmar email ou redefinir senha.'
+            })
+          }
         } else {
           results.push({
             email: user.email,
@@ -50,11 +65,26 @@ export async function POST() {
         continue
       }
 
-      results.push({
-        email: user.email,
-        status: 'success',
-        message: 'Usuário criado com sucesso! Verifique o email para confirmação.'
-      })
+      // Se chegou aqui, usuário foi criado mas pode precisar de confirmação
+      if (data.user && !data.session) {
+        results.push({
+          email: user.email,
+          status: 'created_needs_confirmation',
+          message: 'Usuário criado mas precisa confirmar email. Verifique a caixa de spam.'
+        })
+      } else if (data.session) {
+        results.push({
+          email: user.email,
+          status: 'success',
+          message: 'Usuário criado e já pode fazer login!'
+        })
+      } else {
+        results.push({
+          email: user.email,
+          status: 'created',
+          message: 'Usuário criado. Verifique se precisa confirmar email.'
+        })
+      }
 
     } catch (error) {
       results.push({
@@ -66,27 +96,33 @@ export async function POST() {
   }
 
   // Resumo final
-  const success = results.filter(r => r.status === 'success').length
-  const exists = results.filter(r => r.status === 'exists').length
+  const success = results.filter(r => r.status === 'success' || r.status === 'already_active').length
+  const needsConfirmation = results.filter(r => r.status === 'created_needs_confirmation').length
+  const inactive = results.filter(r => r.status === 'exists_but_inactive').length
   const errors = results.filter(r => r.status === 'error').length
 
   console.log('✅ Processo concluído!')
-  console.log(`📊 Sucessos: ${success}, Já existiam: ${exists}, Erros: ${errors}`)
+  console.log(`📊 Ativos: ${success}, Precisam confirmação: ${needsConfirmation}, Inativos: ${inactive}, Erros: ${errors}`)
 
   return NextResponse.json({
     message: 'Processo de criação de usuários concluído',
     summary: {
       total: usersToCreate.length,
       success,
-      exists,
+      needsConfirmation,
+      inactive,
       errors
     },
     details: results,
     instructions: {
       password: defaultPassword,
-      note: 'Senha padrão para todos os usuários. Eles devem fazer login e alterar a senha.',
+      note: 'Se usuários precisarem confirmar email, eles devem verificar a caixa de entrada e spam.',
       loginUrl: 'http://localhost:3000/login',
-      nextStep: 'Se necessário, atualize manualmente a role na tabela profiles para secretaria'
+      troubleshooting: {
+        case1: 'Se diz "não registrado": usuário não foi criado ou precisa confirmação',
+        case2: 'Se diz "senha incorreta": usuário foi criado com senha diferente',
+        solution: 'Tente executar o script novamente ou verifique o painel do Supabase'
+      }
     }
   })
 }
