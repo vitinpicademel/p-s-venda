@@ -1,0 +1,31 @@
+============================================
+COPIE E COLE ESTES VALORES NA VERCEL
+============================================
+
+1. Acesse: https://vercel.com → Seu Projeto → Settings → Environment Variables
+
+2. Adicione estas 2 variáveis:
+
+-------------------------------------------
+VARIÁVEL 1:
+-------------------------------------------
+Name: NEXT_PUBLIC_SUPABASE_URL
+Value: https://qpjusjbldxttmxmdatxu.supabase.co
+Environments: ✅ Production ✅ Preview ✅ Development
+
+-------------------------------------------
+VARIÁVEL 2:
+-------------------------------------------
+Name: NEXT_PUBLIC_SUPABASE_ANON_KEY
+Value: sb_publishable_k57Ivc24Wkx-vuYmuVgAeg_WV3faEUN
+Environments: ✅ Production ✅ Preview ✅ Development
+
+-------------------------------------------
+3. Clique em SAVE para cada variável
+
+4. Vá em Deployments → 3 pontos (⋯) → Redeploy
+
+============================================
+PRONTO! O site vai funcionar após o redeploy
+============================================
+

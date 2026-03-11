@@ -1,0 +1,40 @@
+⚠️⚠️⚠️ ESTÁ ERRADO! ⚠️⚠️⚠️
+
+Você colocou a URL como KEY!
+
+============================================
+CORREÇÃO URGENTE:
+============================================
+
+1. DELETE a variável que você criou (clique no X)
+
+2. Adicione estas 2 variáveis CORRETAS:
+
+-------------------------------------------
+VARIÁVEL 1:
+-------------------------------------------
+KEY: NEXT_PUBLIC_SUPABASE_URL
+VALUE: https://qpjusjbldxttmxmdatxu.supabase.co
+Environments: ✅ All Environments (ou marque Production, Preview, Development)
+
+-------------------------------------------
+VARIÁVEL 2:
+-------------------------------------------
+KEY: NEXT_PUBLIC_SUPABASE_ANON_KEY
+VALUE: sb_publishable_k57Ivc24Wkx-vuYmuVgAeg_WV3faEUN
+Environments: ✅ All Environments (ou marque Production, Preview, Development)
+
+-------------------------------------------
+
+3. Clique em SAVE
+
+4. Vá em Deployments → Redeploy
+
+============================================
+O NOME DA VARIÁVEL (KEY) DEVE SER:
+- NEXT_PUBLIC_SUPABASE_URL
+- NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+NÃO coloque a URL como KEY!
+============================================
+
