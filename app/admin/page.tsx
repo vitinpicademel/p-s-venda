@@ -59,6 +59,7 @@ import ProcessDocumentsList from "@/components/ProcessDocumentsList";
 import ProcessHistory from "@/components/ProcessHistory";
 import Step1Upload from "@/components/Step1Upload";
 import { Select } from "@/components/ui/select-shadcn";
+import { usePermissions } from "@/lib/usePermissions";
 
 // Configuração das etapas do processo
 const stepsConfig = [
@@ -76,6 +77,7 @@ const stepsConfig = [
 // Tipo para processo (do Supabase)
 type Process = {
   id: string;
+  user_id: string;
   client_name: string;
   client_email: string;
   property_address: string | null;
@@ -140,6 +142,38 @@ export default function AdminPage() {
     property_address: "",
   });
   const { toasts, showToast, removeToast } = useToast();
+
+  // Estado do usuário autenticado
+  const [currentUser, setCurrentUser] = useState<{ id: string; role: string } | null>(null);
+
+  // Permissões do usuário
+  const permissions = usePermissions(currentUser?.role as any, currentUser?.id);
+
+  // Obter usuário atual e role
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        // Obter role do perfil
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+        
+        if (profile) {
+          setCurrentUser({
+            id: user.id,
+            role: profile.role
+          });
+        }
+      }
+    };
+
+    getCurrentUser();
+  }, []);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -1422,13 +1456,16 @@ export default function AdminPage() {
                       </div>
 
                       <div className="grid grid-cols-2 gap-2">
-                        <Button
-                          className="w-full bg-[#d4a574] hover:bg-[#c49564] text-[#302521] gap-2"
-                          onClick={() => handleOpenSheet(process.id, false)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                          Editar Processo
-                        </Button>
+                        {/* Botão Editar - apenas admin ou dono */}
+                        {((currentUser?.role === 'admin') || (process?.user_id === currentUser?.id)) && (
+                          <Button
+                            className="w-full bg-[#d4a574] hover:bg-[#c49564] text-[#302521] gap-2"
+                            onClick={() => handleOpenSheet(process.id, false)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                            Editar Processo
+                          </Button>
+                        )}
                         <Button
                           className="w-full gap-2"
                           variant="outline"
@@ -1567,7 +1604,8 @@ export default function AdminPage() {
                                   Modo Visualização
                                 </span>
                               )}
-                              {!isReadOnlyView && (
+                              {/* Botão Editar - apenas admin ou dono */}
+                              {((currentUser?.role === 'admin') || (selectedProcess?.user_id === currentUser?.id)) && (
                                 <Button
                                   onClick={handleStartEdit}
                                   variant="ghost"
