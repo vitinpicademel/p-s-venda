@@ -3,7 +3,7 @@ import { Profile } from '@/types/database';
 export type UserRole = Profile['role'];
 
 // Hook para verificar permissões do usuário
-export function usePermissions(userRole: UserRole | null | undefined) {
+export function usePermissions(userRole: UserRole | null | undefined, authUserId?: string) {
   // Verifica se o usuário tem permissão de edição
   const hasEditPermission = (): boolean => {
     if (!userRole) return false;
@@ -13,25 +13,28 @@ export function usePermissions(userRole: UserRole | null | undefined) {
   // Verifica se o usuário pode criar novos processos
   const canCreateProcess = (): boolean => {
     if (!userRole) return false;
-    return userRole === 'admin';
+    return ['admin', 'secretaria', 'financeiro', 'administrativo', 'gestor'].includes(userRole);
   };
 
   // Verifica se o usuário pode editar processos
-  const canEditProcess = (): boolean => {
+  const canEditProcess = (processUserId?: string): boolean => {
     if (!userRole) return false;
-    return userRole === 'admin';
+    if (userRole === 'admin') return true;
+    return processUserId === authUserId;
   };
 
   // Verifica se o usuário pode alterar status das etapas
-  const canToggleSteps = (): boolean => {
+  const canToggleSteps = (processUserId?: string): boolean => {
     if (!userRole) return false;
-    return userRole === 'admin';
+    if (userRole === 'admin') return true;
+    return processUserId === authUserId;
   };
 
   // Verifica se o usuário pode fazer upload de arquivos
-  const canUploadFiles = (): boolean => {
+  const canUploadFiles = (processUserId?: string): boolean => {
     if (!userRole) return false;
-    return userRole === 'admin';
+    if (userRole === 'admin') return true;
+    return processUserId === authUserId;
   };
 
   // Verifica se o usuário pode visualizar processos (todos exceto clientes)

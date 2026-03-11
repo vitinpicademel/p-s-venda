@@ -59,6 +59,7 @@ import ProcessDocumentsList from "@/components/ProcessDocumentsList";
 import ProcessHistory from "@/components/ProcessHistory";
 import Step1Upload from "@/components/Step1Upload";
 import { Select } from "@/components/ui/select-shadcn";
+import { usePermissions } from "@/lib/usePermissions";
 
 // Configuração das etapas do processo
 const stepsConfig = [
@@ -76,6 +77,7 @@ const stepsConfig = [
 // Tipo para processo (do Supabase)
 type Process = {
   id: string;
+  user_id: string;
   client_name: string;
   client_email: string;
   property_address: string | null;
@@ -140,6 +142,38 @@ export default function AdminPage() {
     property_address: "",
   });
   const { toasts, showToast, removeToast } = useToast();
+
+  // Estado do usuário autenticado
+  const [currentUser, setCurrentUser] = useState<{ id: string; role: string } | null>(null);
+
+  // Permissões do usuário
+  const permissions = usePermissions(currentUser?.role as any, currentUser?.id);
+
+  // Obter usuário atual e role
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        // Obter role do perfil
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+        
+        if (profile) {
+          setCurrentUser({
+            id: user.id,
+            role: profile.role
+          });
+        }
+      }
+    };
+
+    getCurrentUser();
+  }, []);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -849,9 +883,15 @@ export default function AdminPage() {
       }
 
       // Cria processo no Supabase
+      const { data: authUser } = await supabase.auth.getUser();
+      if (!authUser) {
+        throw new Error("Usuário não autenticado");
+      }
+
       const { data, error } = await supabase
         .from("processes")
         .insert({
+          user_id: authUser.id, // Adicionar o ID do usuário criador
           client_name: formData.clientName,
           client_email: formData.clientEmail,
           property_address: formData.propertyAddress,
@@ -877,11 +917,10 @@ export default function AdminPage() {
       if (error) throw error;
 
       // Registrar log de criação de processo
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
+      if (authUser) {
         await logHelpers.processCreated(
           data.id,
-          user.id,
+          authUser.id,
           formData.clientName
         );
         
@@ -889,7 +928,7 @@ export default function AdminPage() {
         if (contractUrl && contractFilename) {
           await logHelpers.contractUploaded(
             data.id,
-            user.id,
+            authUser.id,
             contractFilename
           );
         }
@@ -1008,23 +1047,25 @@ export default function AdminPage() {
               <h2 className="text-3xl font-bold text-slate-800 mb-2">Processos em Andamento</h2>
               <p className="text-slate-600">Gerencie os processos de venda dos seus clientes</p>
             </div>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-[#d4a574] hover:bg-[#c49564] text-[#302521] shadow-lg gap-2">
-                  <Plus className="h-5 w-5" />
-                  Novo Processo
-                </Button>
-              </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle className="text-2xl">Criar Novo Processo</DialogTitle>
-                <DialogDescription>
-                  Preencha os dados do cliente e faça upload do contrato PDF
-                </DialogDescription>
-              </DialogHeader>
+            {/* Botão Novo Processo - visível apenas para roles permitidas */}
+            {permissions.canCreateProcess() && (
+              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button className="bg-[#d4a574] hover:bg-[#c49564] text-[#302521] shadow-lg gap-2">
+                    <Plus className="h-5 w-5" />
+                    Novo Processo
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle className="text-2xl">Criar Novo Processo</DialogTitle>
+                    <DialogDescription>
+                      Preencha os dados do cliente e faça upload do contrato PDF
+                    </DialogDescription>
+                  </DialogHeader>
 
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid gap-4 sm:grid-cols-2">
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="clientName">Nome do Cliente *</Label>
                     <Input
@@ -1150,23 +1191,16 @@ export default function AdminPage() {
                   >
                     Cancelar
                   </Button>
-                  <Button
-                    type="submit"
-                    className="bg-[#d4a574] hover:bg-[#c49564] text-[#302521]"
-                    disabled={isUploading}
-                  >
-                    {isUploading ? (
-                      <>
-                        <Upload className="h-4 w-4 mr-2 animate-spin" />
-                        Enviando...
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="h-4 w-4 mr-2" />
-                        Criar Processo
-                      </>
-                    )}
-                  </Button>
+                  {/* Botão Criar Processo - visível apenas para roles permitidas */}
+                  {permissions.canCreateProcess() && (
+                    <Button
+                      onClick={() => setIsDialogOpen(true)}
+                      className="bg-[#d4a574] hover:bg-[#c49564] text-white"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Criar Processo
+                    </Button>
+                  )}
                 </DialogFooter>
               </form>
             </DialogContent>
