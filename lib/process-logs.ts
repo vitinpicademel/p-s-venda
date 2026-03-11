@@ -14,20 +14,28 @@ export async function createProcessLog(params: CreateProcessLogParams): Promise<
   }
 
   try {
-    const { data, error } = await supabase.rpc('create_process_log', {
-      p_process_id: params.processId,
-      p_user_id: params.userId,
-      p_action: params.action,
-      p_description: params.description,
-      p_metadata: params.metadata || {}
-    });
+    const { data, error } = await supabase
+      .from('process_logs')
+      .insert({
+        process_id: params.processId,
+        user_id: params.userId,
+        action: params.action,
+        details: {
+          description: params.description,
+          ...params.metadata
+        },
+        old_values: null,
+        new_values: null
+      })
+      .select('id')
+      .single();
 
     if (error) {
       console.error('❌ Erro ao criar log:', error);
       return null;
     }
 
-    return data;
+    return data.id;
   } catch (err) {
     console.error('❌ Exceção ao criar log:', err);
     return null;

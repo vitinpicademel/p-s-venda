@@ -246,6 +246,47 @@ export default function AdminPage() {
     }
   };
 
+  // Atualizar correspondente
+  const handleUpdateCorrespondent = async (processId: string, correspondent: string) => {
+    const supabase = createClient();
+    if (!supabase) return;
+
+    try {
+      const { error } = await supabase
+        .from("processes")
+        .update({ correspondent })
+        .eq("id", processId);
+
+      if (error) throw error;
+
+      // Atualizar estado local
+      setProcesses((prev) =>
+        prev.map((p) =>
+          p.id === processId ? { ...p, correspondent } : p
+        )
+      );
+
+      setFilteredProcesses((prev) =>
+        prev.map((p) =>
+          p.id === processId ? { ...p, correspondent } : p
+        )
+      );
+
+      showToast({
+        title: "Sucesso",
+        description: "Correspondente atualizado com sucesso!",
+        type: "success",
+      });
+    } catch (error) {
+      console.error("Erro ao atualizar correspondente:", error);
+      showToast({
+        title: "Erro",
+        description: "Não foi possível atualizar o correspondente.",
+        type: "error",
+      });
+    }
+  };
+
   const downloadContract = async (contractUrl: string | null, contractFilename: string | null) => {
     if (!contractUrl || !contractFilename) {
       showToast({
@@ -1504,10 +1545,7 @@ export default function AdminPage() {
                             <div className="flex items-center gap-2">
                               <Select
                                 value={selectedProcess.correspondent || ""}
-                                onChange={(e) => {
-                                  // TODO: Implementar função de atualização
-                                  console.log("Correspondent changed:", e.target.value);
-                                }}
+                                onChange={(e) => handleUpdateCorrespondent(selectedProcess.id, e.target.value)}
                                 className="w-32"
                               >
                                 <option value="">Não definido</option>
