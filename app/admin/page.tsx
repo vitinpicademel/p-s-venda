@@ -57,6 +57,8 @@ import { logHelpers } from "@/lib/process-logs";
 import { useRouter } from "next/navigation";
 import ProcessDocumentsList from "@/components/ProcessDocumentsList";
 import ProcessHistory from "@/components/ProcessHistory";
+import Step1Upload from "@/components/Step1Upload";
+import { usePermissions } from "@/lib/usePermissions";
 
 // Configuração das etapas do processo
 const stepsConfig = [
