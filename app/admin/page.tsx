@@ -224,7 +224,10 @@ export default function AdminPage() {
       setIsLoading(true);
       const { data, error } = await supabase
         .from("processes")
-        .select("*")
+        .select(`
+          *,
+          user_id
+        `)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -883,9 +886,15 @@ export default function AdminPage() {
       }
 
       // Cria processo no Supabase
+      const { data: authUser } = await supabase.auth.getUser();
+      if (!authUser) {
+        throw new Error("Usuário não autenticado");
+      }
+
       const { data, error } = await supabase
         .from("processes")
         .insert({
+          user_id: authUser.id, // Adicionar o ID do usuário criador
           client_name: formData.clientName,
           client_email: formData.clientEmail,
           property_address: formData.propertyAddress,
@@ -911,11 +920,10 @@ export default function AdminPage() {
       if (error) throw error;
 
       // Registrar log de criação de processo
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
+      if (authUser) {
         await logHelpers.processCreated(
           data.id,
-          user.id,
+          authUser.id,
           formData.clientName
         );
         
@@ -923,7 +931,7 @@ export default function AdminPage() {
         if (contractUrl && contractFilename) {
           await logHelpers.contractUploaded(
             data.id,
-            user.id,
+            authUser.id,
             contractFilename
           );
         }
