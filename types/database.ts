@@ -9,6 +9,7 @@ export type Profile = {
 
 export type Process = {
   id: string;
+  user_id?: string | null;
   client_id: string;
   admin_id: string;
   contract_url: string | null;

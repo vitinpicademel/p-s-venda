@@ -224,10 +224,7 @@ export default function AdminPage() {
       setIsLoading(true);
       const { data, error } = await supabase
         .from("processes")
-        .select(`
-          *,
-          user_id
-        `)
+        .select("*")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -1464,8 +1461,18 @@ export default function AdminPage() {
                       </div>
 
                       <div className="grid grid-cols-2 gap-2">
-                        {/* Botão Editar - apenas admin ou dono */}
-                        {((currentUser?.role === 'admin') || (process?.user_id === currentUser?.id)) && (
+                        {/* Debug - Botão Editar */}
+                        {(() => {
+                          const canEdit = (currentUser?.role === 'admin') || (process?.user_id === currentUser?.id);
+                          console.log("Debug Permissão ProcessCard:", { 
+                            processId: process.id, 
+                            processUserId: process.user_id, 
+                            currentUserId: currentUser?.id, 
+                            currentUserRole: currentUser?.role,
+                            canEdit 
+                          });
+                          return canEdit;
+                        })() && (
                           <Button
                             className="w-full bg-[#d4a574] hover:bg-[#c49564] text-[#302521] gap-2"
                             onClick={() => handleOpenSheet(process.id, false)}
@@ -1607,7 +1614,20 @@ export default function AdminPage() {
                                 <option value="Euripedes">Euripedes</option>
                                 <option value="Outro">Outro</option>
                               </Select>
-                              {isReadOnlyView && (
+                              {/* Debug - Badge e Botão Editar */}
+                              {(() => {
+                                const canEdit = (currentUser?.role === 'admin') || (selectedProcess?.user_id === currentUser?.id);
+                                console.log("Debug Permissão ProcessStatusSheet:", { 
+                                  processId: selectedProcess.id, 
+                                  processUserId: selectedProcess.user_id, 
+                                  currentUserId: currentUser?.id, 
+                                  currentUserRole: currentUser?.role,
+                                  canEdit,
+                                  isReadOnlyView
+                                });
+                                return null;
+                              })()}
+                              {((currentUser?.role === 'admin') || (selectedProcess?.user_id === currentUser?.id)) ? null : (
                                 <span className="px-2 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
                                   Modo Visualização
                                 </span>
