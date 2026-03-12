@@ -1465,25 +1465,20 @@ export default function AdminPage() {
                       </div>
 
                       <div className="grid grid-cols-2 gap-2">
-                        {/* Botão Editar - REGRA ESTRITA */}
+                        {/* REGRA SIMPLES: Secretaria edita apenas seus próprios processos */}
                         {(() => {
-                          const isAdmin = currentUser?.role === 'admin';
-                          const isSecretaria = currentUser?.role === 'secretaria';
-                          const isOwner = process?.user_id === currentUser?.id;
-                          const canEdit = isAdmin || (isSecretaria && isOwner);
+                          // 1. Verificar se é admin
+                          if (currentUser?.role === 'admin') {
+                            return true; // Admin edita tudo
+                          }
                           
-                          console.log("PERMISSÃO EDITAR:", {
-                            processo: process.id,
-                            currentUser: currentUser?.id,
-                            currentUserRole: currentUser?.role,
-                            processUserId: process?.user_id,
-                            isAdmin,
-                            isSecretaria,
-                            isOwner,
-                            canEdit
-                          });
+                          // 2. Verificar se é secretaria E dono do processo
+                          if (currentUser?.role === 'secretaria' && process?.user_id === currentUser?.id) {
+                            return true; // Secretaria edita apenas seus próprios
+                          }
                           
-                          return canEdit;
+                          // 3. Demais casos: não pode editar
+                          return false;
                         })() && (
                           <Button
                             className="w-full bg-[#d4a574] hover:bg-[#c49564] text-[#302521] gap-2"
