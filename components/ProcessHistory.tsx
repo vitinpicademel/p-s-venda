@@ -11,7 +11,7 @@ interface ProcessHistoryProps {
 }
 
 export default function ProcessHistory({ processId }: ProcessHistoryProps) {
-  const [logs, setLogs] = useState<ProcessLog[]>([]);
+  const [logs, setLogs] = useState<(ProcessLog & { user_email?: string; user_name?: string })[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -27,7 +27,30 @@ export default function ProcessHistory({ processId }: ProcessHistoryProps) {
           .order("created_at", { ascending: false });
 
         if (error) throw error;
-        setLogs(data || []);
+
+        // Buscar emails dos usuários envolvidos nos logs
+        const userIds = [...new Set((data || []).map((l: any) => l.user_id).filter(Boolean))];
+        let profilesMap: Record<string, { email: string; full_name?: string }> = {};
+
+        if (userIds.length > 0) {
+          const { data: profilesData } = await supabase
+            .from("profiles")
+            .select("id, email, full_name")
+            .in("id", userIds);
+
+          profilesMap = (profilesData || []).reduce((acc: any, p: any) => {
+            acc[p.id] = { email: p.email, full_name: p.full_name };
+            return acc;
+          }, {});
+        }
+
+        const logsWithUsers = (data || []).map((log: any) => ({
+          ...log,
+          user_email: profilesMap[log.user_id]?.email,
+          user_name: profilesMap[log.user_id]?.full_name,
+        }));
+
+        setLogs(logsWithUsers);
       } catch (error) {
         console.error("Erro ao buscar histórico:", error);
       } finally {
@@ -112,6 +135,12 @@ export default function ProcessHistory({ processId }: ProcessHistoryProps) {
                 <p className="text-sm font-medium text-slate-800">
                   {log.description}
                 </p>
+                {(log.user_name || log.user_email) && (
+                  <p className="text-xs text-[#d4a574] mt-0.5 flex items-center gap-1">
+                    <User className="h-3 w-3" />
+                    {log.user_name || log.user_email}
+                  </p>
+                )}
                 <p className="text-xs text-slate-500 mt-1">
                   {formatDate(log.created_at)}
                 </p>
