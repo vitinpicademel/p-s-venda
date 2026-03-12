@@ -883,8 +883,8 @@ export default function AdminPage() {
       }
 
       // Cria processo no Supabase
-      const { data: authUser } = await supabase.auth.getUser();
-      if (!authUser) {
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+      if (authError || !authUser) {
         throw new Error("Usuário não autenticado");
       }
 
