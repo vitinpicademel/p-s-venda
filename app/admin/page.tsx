@@ -1622,8 +1622,21 @@ export default function AdminPage() {
                                 className="w-32"
                               >
                                 <option value="">Não definido</option>
-                                <option value="REM">REM</option>
-                                <option value="Euripedes">Euripedes</option>
+                                <optgroup label="Corretores">
+                                  <option value="REM">REM</option>
+                                  <option value="Euripedes">Eurípedes</option>
+                                  <option value="Silvia">Silvia</option>
+                                  <option value="Dreice">Dreice</option>
+                                  <option value="Italo">Italo</option>
+                                  <option value="Gustavo">Gustavo</option>
+                                </optgroup>
+                                <option value="A vista">À vista</option>
+                                <optgroup label="Incorporadoras">
+                                  <option value="Vitta">Vitta</option>
+                                  <option value="MRV">MRV</option>
+                                  <option value="INC">INC</option>
+                                  <option value="PAFIL">PAFIL</option>
+                                </optgroup>
                                 <option value="Outro">Outro</option>
                               </Select>
                               {/* Botão Editar - admin OU secretaria dono do processo */}
