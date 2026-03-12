@@ -888,6 +888,8 @@ export default function AdminPage() {
         throw new Error("Usuário não autenticado");
       }
 
+      console.log("DEBUG - Criando processo com user_id:", authUser.id);
+
       const { data, error } = await supabase
         .from("processes")
         .insert({
@@ -913,6 +915,8 @@ export default function AdminPage() {
         })
         .select()
         .single();
+
+      console.log("DEBUG - Processo criado:", { data, error });
 
       if (error) throw error;
 
@@ -1461,8 +1465,8 @@ export default function AdminPage() {
                       </div>
 
                       <div className="grid grid-cols-2 gap-2">
-                        {/* Botão Editar - LÓGICA SIMPLES E DIRETA */}
-                        {(currentUser?.role === 'admin' || 
+                        {/* Botão Editar - admin OU secretaria dono do processo */}
+                        {((currentUser?.role === 'admin') || 
                           (currentUser?.role === 'secretaria' && process?.user_id === currentUser?.id)) && (
                           <Button
                             className="w-full bg-[#d4a574] hover:bg-[#c49564] text-[#302521] gap-2"
@@ -1605,15 +1609,15 @@ export default function AdminPage() {
                                 <option value="Euripedes">Euripedes</option>
                                 <option value="Outro">Outro</option>
                               </Select>
-                              {/* Botão Editar - LÓGICA SIMPLES E DIRETA */}
-                              {(currentUser?.role === 'admin' || 
+                              {/* Botão Editar - admin OU secretaria dono do processo */}
+                              {((currentUser?.role === 'admin') || 
                                 (currentUser?.role === 'secretaria' && selectedProcess?.user_id === currentUser?.id)) ? null : (
                                 <span className="px-2 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
                                   Modo Visualização
                                 </span>
                               )}
-                              {/* Botão Editar no modal - LÓGICA SIMPLES */}
-                              {(currentUser?.role === 'admin' || 
+                              {/* Botão Editar no modal */}
+                              {((currentUser?.role === 'admin') || 
                                 (currentUser?.role === 'secretaria' && selectedProcess?.user_id === currentUser?.id)) && (
                                 <Button
                                   onClick={handleStartEdit}
