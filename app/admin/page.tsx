@@ -1461,18 +1461,9 @@ export default function AdminPage() {
                       </div>
 
                       <div className="grid grid-cols-2 gap-2">
-                        {/* Debug - Botão Editar */}
-                        {(() => {
-                          const canEdit = (currentUser?.role === 'admin') || (process?.user_id === currentUser?.id);
-                          console.log("Debug Permissão ProcessCard:", { 
-                            processId: process.id, 
-                            processUserId: process.user_id, 
-                            currentUserId: currentUser?.id, 
-                            currentUserRole: currentUser?.role,
-                            canEdit 
-                          });
-                          return canEdit;
-                        })() && (
+                        {/* Botão Editar - admin OU secretaria dono do processo */}
+                        {((currentUser?.role === 'admin') || 
+                          (currentUser?.role === 'secretaria' && process?.user_id === currentUser?.id)) && (
                           <Button
                             className="w-full bg-[#d4a574] hover:bg-[#c49564] text-[#302521] gap-2"
                             onClick={() => handleOpenSheet(process.id, false)}
@@ -1614,26 +1605,16 @@ export default function AdminPage() {
                                 <option value="Euripedes">Euripedes</option>
                                 <option value="Outro">Outro</option>
                               </Select>
-                              {/* Debug - Badge e Botão Editar */}
-                              {(() => {
-                                const canEdit = (currentUser?.role === 'admin') || (selectedProcess?.user_id === currentUser?.id);
-                                console.log("Debug Permissão ProcessStatusSheet:", { 
-                                  processId: selectedProcess.id, 
-                                  processUserId: selectedProcess.user_id, 
-                                  currentUserId: currentUser?.id, 
-                                  currentUserRole: currentUser?.role,
-                                  canEdit,
-                                  isReadOnlyView
-                                });
-                                return null;
-                              })()}
-                              {((currentUser?.role === 'admin') || (selectedProcess?.user_id === currentUser?.id)) ? null : (
+                              {/* Botão Editar - admin OU secretaria dono do processo */}
+                              {((currentUser?.role === 'admin') || 
+                                (currentUser?.role === 'secretaria' && selectedProcess?.user_id === currentUser?.id)) ? null : (
                                 <span className="px-2 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
                                   Modo Visualização
                                 </span>
                               )}
-                              {/* Botão Editar - apenas admin ou dono */}
-                              {((currentUser?.role === 'admin') || (selectedProcess?.user_id === currentUser?.id)) && (
+                              {/* Botão Editar no modal */}
+                              {((currentUser?.role === 'admin') || 
+                                (currentUser?.role === 'secretaria' && selectedProcess?.user_id === currentUser?.id)) && (
                                 <Button
                                   onClick={handleStartEdit}
                                   variant="ghost"
