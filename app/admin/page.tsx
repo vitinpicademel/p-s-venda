@@ -889,30 +889,35 @@ export default function AdminPage() {
       }
 
       console.log("DEBUG - Criando processo com user_id:", authUser.id);
+      console.log("DEBUG - authUser completo:", authUser);
+
+      const insertData = {
+        user_id: authUser.id, // Adicionar o ID do usuário criador
+        client_name: formData.clientName,
+        client_email: formData.clientEmail,
+        property_address: formData.propertyAddress,
+        property_value: propertyValue,
+        contract_url: contractUrl,
+        contract_filename: contractFilename,
+        status_steps: {
+          etapa1_ficha_planilha: false,
+          etapa2_emissao_contrato: false,
+          etapa3_validacao_juridico: false,
+          etapa4_assinaturas_contrato: false,
+          etapa5_solicitacao_engenharia: false,
+          etapa6_assinatura_bancario: false,
+          etapa7_itbi: false,
+          etapa8_cartorio_registro: false,
+          etapa9_entrega_chaves: false,
+        },
+        status: "in_progress",
+      };
+
+      console.log("DEBUG - Dados sendo inseridos:", insertData);
 
       const { data, error } = await supabase
         .from("processes")
-        .insert({
-          user_id: authUser.id, // Adicionar o ID do usuário criador
-          client_name: formData.clientName,
-          client_email: formData.clientEmail,
-          property_address: formData.propertyAddress,
-          property_value: propertyValue,
-          contract_url: contractUrl,
-          contract_filename: contractFilename,
-          status_steps: {
-            etapa1_ficha_planilha: false,
-            etapa2_emissao_contrato: false,
-            etapa3_validacao_juridico: false,
-            etapa4_assinaturas_contrato: false,
-            etapa5_solicitacao_engenharia: false,
-            etapa6_assinatura_bancario: false,
-            etapa7_itbi: false,
-            etapa8_cartorio_registro: false,
-            etapa9_entrega_chaves: false,
-          },
-          status: "in_progress",
-        })
+        .insert(insertData)
         .select()
         .single();
 
