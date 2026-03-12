@@ -204,7 +204,13 @@ export default function ProcessDocumentsForm({
       return null;
     }
 
-    // Verificar se é da equipe
+    // Verificar se é admin ou equipe
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
     const allowedRoles = ["admin", "secretaria", "financeiro", "administrativo", "gestor"];
     if (!profile?.role || !allowedRoles.includes(profile.role)) {
       console.error("❌ Usuário sem permissão para upload. Role:", profile?.role);
