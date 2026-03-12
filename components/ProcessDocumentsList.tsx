@@ -26,7 +26,7 @@ export default function ProcessDocumentsList({
   const [documents, setDocuments] = useState<ProcessDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [selectedPersonType, setSelectedPersonType] = useState<"comprador" | "vendedor" | null>(null);
+  const [selectedPersonType, setSelectedPersonType] = useState<"comprador" | "vendedor" | "imovel" | null>(null);
   const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null);
 
   const supabase = useMemo(() => createClient(), []);
@@ -37,13 +37,13 @@ export default function ProcessDocumentsList({
     try {
       setIsLoading(true);
       
-      // Buscar APENAS documentos de dossiê (comprador e vendedor)
+      // Buscar APENAS documentos de dossiê (comprador, vendedor e imovel)
       // EXCLUIR contrato_inicial - ele não deve aparecer aqui
       const { data, error } = await supabase
         .from("process_documents")
         .select("*")
         .eq("process_id", processId)
-        .in("doc_type", ["dossie_comprador", "dossie_vendedor"])
+        .in("doc_type", ["dossie_comprador", "dossie_vendedor", "dossie_imovel"])
         .order("created_at", { ascending: false });
 
       if (error) {
@@ -63,7 +63,7 @@ export default function ProcessDocumentsList({
           const filtered = (fallbackData || []).filter((doc: any) => {
             const docs = doc.documents || {};
             const hasFilePath = !!docs.file_path;
-            const hasValidPersonType = doc.person_type === "comprador" || doc.person_type === "vendedor";
+            const hasValidPersonType = doc.person_type === "comprador" || doc.person_type === "vendedor" || doc.person_type === "imovel";
             // Excluir se for contrato_inicial (mesmo sem doc_type, podemos verificar pelo documents.doc_type)
             const isContratoInicial = docs.doc_type === "contrato_inicial" || doc.doc_type === "contrato_inicial";
             return hasFilePath && hasValidPersonType && !isContratoInicial;
@@ -79,12 +79,13 @@ export default function ProcessDocumentsList({
       const filtered = (data || []).filter((doc: any) => {
         const docs = doc.documents || {};
         const hasFilePath = !!docs.file_path;
-        // Garantir que é dossie_comprador ou dossie_vendedor
-        const isValidDocType = doc.doc_type === "dossie_comprador" || doc.doc_type === "dossie_vendedor";
+        // Garantir que é dossie_comprador, dossie_vendedor ou dossie_imovel
+        const isValidDocType = doc.doc_type === "dossie_comprador" || doc.doc_type === "dossie_vendedor" || doc.doc_type === "dossie_imovel";
         // Garantir que person_type corresponde ao doc_type
         const personTypeMatches = 
           (doc.doc_type === "dossie_comprador" && doc.person_type === "comprador") ||
-          (doc.doc_type === "dossie_vendedor" && doc.person_type === "vendedor");
+          (doc.doc_type === "dossie_vendedor" && doc.person_type === "vendedor") ||
+          (doc.doc_type === "dossie_imovel" && doc.person_type === "imovel");
         
         return hasFilePath && isValidDocType && personTypeMatches;
       });
@@ -104,7 +105,7 @@ export default function ProcessDocumentsList({
     }
   }, [fetchDocuments, supabase]);
 
-  const handleOpenForm = (personType: "comprador" | "vendedor") => {
+  const handleOpenForm = (personType: "comprador" | "vendedor" | "imovel") => {
     setSelectedPersonType(personType);
     setIsFormOpen(true);
   };
@@ -215,6 +216,17 @@ export default function ProcessDocumentsList({
     return (
       d.doc_type === "dossie_vendedor" &&
       d.person_type === "vendedor" &&
+      hasFilePath
+    );
+  });
+
+  // Imóvel: APENAS se existir doc_type: 'dossie_imovel' E person_type: 'imovel'
+  const hasImovel = documents.some((d) => {
+    const docs = d.documents as any;
+    const hasFilePath = !!docs.file_path;
+    return (
+      d.doc_type === "dossie_imovel" &&
+      d.person_type === "imovel" &&
       hasFilePath
     );
   });
@@ -427,6 +439,105 @@ export default function ProcessDocumentsList({
             ) : (
               <p className="text-sm text-slate-500 text-center py-4">
                 Nenhum documento do vendedor foi adicionado ainda.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Imóvel */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-[#d4a574]" />
+                <CardTitle className="text-lg">Documentos do Imóvel</CardTitle>
+              </div>
+              {!isReadOnly && (
+                <Button
+                  size="sm"
+                  className="bg-[#d4a574] hover:bg-[#c49564] text-[#302521] gap-2"
+                  onClick={() => handleOpenForm("imovel")}
+                >
+                  <Plus className="h-4 w-4" />
+                  Adicionar Documentos
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            {hasImovel ? (
+              (() => {
+                // Buscar TODOS os documentos do tipo dossie_imovel
+                const imovelDocs = documents.filter((d) => {
+                  const docs = d.documents as any;
+                  const hasFilePath = !!docs.file_path;
+                  return (
+                    d.doc_type === "dossie_imovel" &&
+                    d.person_type === "imovel" &&
+                    hasFilePath
+                  );
+                });
+                
+                if (imovelDocs.length === 0) return null;
+
+                const isComplete = imovelDocs.length > 0; // Considera completo se tiver pelo menos 1 arquivo
+                const docCount = imovelDocs.length;
+
+                return (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {isComplete ? (
+                          <CheckCircle2 className="h-5 w-5 text-green-600" />
+                        ) : (
+                          <Clock className="h-5 w-5 text-amber-600" />
+                        )}
+                        <span className="font-medium">
+                          {docCount} arquivo(s) enviados
+                        </span>
+                      </div>
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          isComplete
+                            ? "bg-green-100 text-green-700"
+                            : "bg-amber-100 text-amber-700"
+                        }`}
+                      >
+                        {isComplete ? "Completo" : "Pendente"}
+                      </span>
+                    </div>
+
+                    {/* Lista de documentos */}
+                    <div className="space-y-2">
+                      {imovelDocs.map((imovelDoc) => (
+                        <DocumentDetails
+                          key={imovelDoc.id}
+                          doc={imovelDoc}
+                          onDelete={handleDeleteDocument}
+                          isDeleting={deletingDocumentId === imovelDoc.id}
+                          isReadOnly={isReadOnly}
+                        />
+                      ))}
+                    </div>
+                    
+                    {/* Botão para adicionar mais documentos */}
+                    {!isReadOnly && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full gap-2"
+                        onClick={() => handleOpenForm("imovel")}
+                      >
+                        <Plus className="h-4 w-4" />
+                        Adicionar mais documentos
+                      </Button>
+                    )}
+                  </div>
+                );
+              })()
+            ) : (
+              <p className="text-sm text-slate-500 text-center py-4">
+                Nenhum documento do imóvel foi adicionado ainda.
               </p>
             )}
           </CardContent>

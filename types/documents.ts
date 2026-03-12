@@ -12,7 +12,7 @@ export type DocumentType =
   | 'dados_bancarios'
   | 'matricula_imovel';
 
-export type PersonType = 'comprador' | 'vendedor';
+export type PersonType = 'comprador' | 'vendedor' | 'imovel';
 
 export interface PersonDocumentData {
   // Documentação completa (único arquivo PDF)
@@ -21,7 +21,7 @@ export interface PersonDocumentData {
   doc_type?: string; // 'documentacao_completa'
 }
 
-export type DocumentTypeCategory = 'dossie_comprador' | 'dossie_vendedor';
+export type DocumentTypeCategory = 'dossie_comprador' | 'dossie_vendedor' | 'dossie_imovel';
 
 export interface ProcessDocument {
   id: string;

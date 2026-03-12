@@ -41,7 +41,7 @@ export default function ProcessDocumentsForm({
 }: ProcessDocumentsFormProps) {
   const { showToast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [personType, setPersonType] = useState<PersonType>(initialPersonType);
+  const [personType, setPersonType] = useState<PersonType | "imovel">(initialPersonType as PersonType | "imovel");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -57,7 +57,7 @@ export default function ProcessDocumentsForm({
 
   const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const { value } = e.target;
-    setPersonType(value as PersonType);
+    setPersonType(value as PersonType | "imovel");
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -322,7 +322,11 @@ export default function ProcessDocumentsForm({
 
         // Salvar no banco de dados
         // IMPORTANTE: doc_type deve corresponder estritamente ao person_type
-        const docType = personType === "comprador" ? "dossie_comprador" : "dossie_vendedor";
+        const docType = personType === "comprador" 
+          ? "dossie_comprador" 
+          : personType === "vendedor" 
+            ? "dossie_vendedor" 
+            : "dossie_imovel";
         
         // Preparar dados para inserção
         const insertData: any = {
@@ -374,7 +378,7 @@ export default function ProcessDocumentsForm({
 
       showToast({
         title: "Documentos enviados com sucesso!",
-        description: `${selectedFiles.length} arquivo(s) de ${personType === "comprador" ? "Comprador" : "Vendedor"} foram salvos.`,
+        description: `${selectedFiles.length} arquivo(s) de ${personType === "comprador" ? "Comprador" : personType === "vendedor" ? "Vendedor" : "Imóvel"} foram salvos.`,
         type: "success",
       });
 
@@ -399,10 +403,12 @@ export default function ProcessDocumentsForm({
           <DialogTitle className="text-xl flex items-center gap-2">
             {personType === "comprador" ? (
               <User className="h-5 w-5 text-[#d4a574]" />
-            ) : (
+            ) : personType === "vendedor" ? (
               <Building2 className="h-5 w-5 text-[#d4a574]" />
+            ) : (
+              <FileText className="h-5 w-5 text-[#d4a574]" />
             )}
-            Documentos - {personType === "comprador" ? "Comprador" : "Vendedor"}
+            Documentos - {personType === "comprador" ? "Comprador" : personType === "vendedor" ? "Vendedor" : "Imóvel"}
           </DialogTitle>
           <DialogDescription className="text-xs">
             Processo: {processClientName}
@@ -421,6 +427,7 @@ export default function ProcessDocumentsForm({
             >
               <option value="comprador">Comprador</option>
               <option value="vendedor">Vendedor</option>
+              <option value="imovel">Imóvel</option>
             </Select>
           </div>
 
