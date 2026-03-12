@@ -1465,9 +1465,26 @@ export default function AdminPage() {
                       </div>
 
                       <div className="grid grid-cols-2 gap-2">
-                        {/* Botão Editar - admin OU secretaria dono do processo */}
-                        {((currentUser?.role === 'admin') || 
-                          (currentUser?.role === 'secretaria' && process?.user_id === currentUser?.id)) && (
+                        {/* Botão Editar - REGRA ESTRITA */}
+                        {(() => {
+                          const isAdmin = currentUser?.role === 'admin';
+                          const isSecretaria = currentUser?.role === 'secretaria';
+                          const isOwner = process?.user_id === currentUser?.id;
+                          const canEdit = isAdmin || (isSecretaria && isOwner);
+                          
+                          console.log("PERMISSÃO EDITAR:", {
+                            processo: process.id,
+                            currentUser: currentUser?.id,
+                            currentUserRole: currentUser?.role,
+                            processUserId: process?.user_id,
+                            isAdmin,
+                            isSecretaria,
+                            isOwner,
+                            canEdit
+                          });
+                          
+                          return canEdit;
+                        })() && (
                           <Button
                             className="w-full bg-[#d4a574] hover:bg-[#c49564] text-[#302521] gap-2"
                             onClick={() => handleOpenSheet(process.id, false)}
