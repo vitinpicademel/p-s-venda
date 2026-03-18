@@ -89,6 +89,7 @@ type Process = {
   sale_date?: string | null;
   commission_installments?: number | null;
   commission_payment_method?: 'boleto' | 'pix' | 'webropay' | null;
+  expected_payment_dates?: string[] | null;
   status_steps: {
     etapa1_ficha_planilha: boolean;
     etapa2_emissao_contrato: boolean;
@@ -198,13 +199,40 @@ export default function AdminPage() {
     sale_date: string;
     commission_installments: string;
     commission_payment_method: "" | "boleto" | "pix" | "webropay";
+    expected_payment_dates: string[];
   }>({
     sale_date: "",
     commission_installments: "",
     commission_payment_method: "",
+    expected_payment_dates: [],
   });
   const [isSavingSaleInfo, setIsSavingSaleInfo] = useState(false);
   const [saveSaleInfoStatus, setSaveSaleInfoStatus] = useState<"idle" | "saved" | "error">("idle");
+  // Payment dates state for create modal
+  const [createPaymentDates, setCreatePaymentDates] = useState<string[]>([""]);
+
+  // Sync createPaymentDates array size with commissionInstallments (create modal)
+  useEffect(() => {
+    const count = Math.max(1, parseInt(formData.commissionInstallments, 10) || 1);
+    setCreatePaymentDates((prev) => {
+      if (prev.length === count) return prev;
+      if (count > prev.length) return [...prev, ...Array(count - prev.length).fill("")];
+      return prev.slice(0, count);
+    });
+  }, [formData.commissionInstallments]);
+
+  // Sync saleInfoData.expected_payment_dates array size with commission_installments (detail panel)
+  useEffect(() => {
+    const count = Math.max(1, parseInt(saleInfoData.commission_installments, 10) || 1);
+    setSaleInfoData((prev) => {
+      const current = prev.expected_payment_dates;
+      if (current.length === count) return prev;
+      const updated = count > current.length
+        ? [...current, ...Array(count - current.length).fill("")]
+        : current.slice(0, count);
+      return { ...prev, expected_payment_dates: updated };
+    });
+  }, [saleInfoData.commission_installments]);
 
   // Buscar processos do Supabase
   useEffect(() => {
@@ -299,6 +327,7 @@ export default function AdminPage() {
         sale_date: process.sale_date || "",
         commission_installments: process.commission_installments != null ? String(process.commission_installments) : "",
         commission_payment_method: (process.commission_payment_method as "" | "boleto" | "pix" | "webropay") || "",
+        expected_payment_dates: process.expected_payment_dates || [],
       });
       setSaveSaleInfoStatus("idle");
     }
@@ -467,6 +496,7 @@ export default function AdminPage() {
           sale_date: saleInfoData.sale_date || null,
           commission_installments: saleInfoData.commission_installments ? parseInt(saleInfoData.commission_installments, 10) : null,
           commission_payment_method: saleInfoData.commission_payment_method || null,
+          expected_payment_dates: saleInfoData.expected_payment_dates.length > 0 ? saleInfoData.expected_payment_dates : null,
         })
         .eq("id", selectedProcessId);
       setIsSavingSaleInfo(false);
@@ -484,6 +514,7 @@ export default function AdminPage() {
                 sale_date: saleInfoData.sale_date || null,
                 commission_installments: saleInfoData.commission_installments ? parseInt(saleInfoData.commission_installments, 10) : null,
                 commission_payment_method: saleInfoData.commission_payment_method || null,
+                expected_payment_dates: saleInfoData.expected_payment_dates.length > 0 ? saleInfoData.expected_payment_dates : null,
               }
             : p
         )
@@ -496,6 +527,7 @@ export default function AdminPage() {
                 sale_date: saleInfoData.sale_date || null,
                 commission_installments: saleInfoData.commission_installments ? parseInt(saleInfoData.commission_installments, 10) : null,
                 commission_payment_method: saleInfoData.commission_payment_method || null,
+                expected_payment_dates: saleInfoData.expected_payment_dates.length > 0 ? saleInfoData.expected_payment_dates : null,
               }
             : p
         )
@@ -979,6 +1011,7 @@ export default function AdminPage() {
         sale_date: formData.saleDate || null,
         commission_installments: formData.commissionInstallments ? parseInt(formData.commissionInstallments, 10) : null,
         commission_payment_method: formData.commissionPaymentMethod || null,
+        expected_payment_dates: createPaymentDates.length > 0 ? createPaymentDates : null,
         status_steps: {
           etapa1_ficha_planilha: false,
           etapa2_emissao_contrato: false,
@@ -1064,6 +1097,7 @@ export default function AdminPage() {
         commissionInstallments: "1",
         commissionPaymentMethod: "",
       });
+      setCreatePaymentDates([""]);
       setSelectedFile(null);
 
       showToast({
@@ -1257,6 +1291,30 @@ export default function AdminPage() {
                     </select>
                   </div>
                 </div>
+
+                {/* Previsão de Recebimento (datas dinâmicas) */}
+                {createPaymentDates.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-slate-600">Previsão de Recebimento</p>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {createPaymentDates.map((date, index) => (
+                        <div key={index} className="flex flex-col gap-1">
+                          <Label htmlFor={`createPayDate-${index}`} className="text-xs text-slate-500">Parcela {index + 1}</Label>
+                          <Input
+                            id={`createPayDate-${index}`}
+                            type="date"
+                            value={date}
+                            onChange={(e) => {
+                              const updated = [...createPaymentDates];
+                              updated[index] = e.target.value;
+                              setCreatePaymentDates(updated);
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label>Contrato PDF *</Label>
@@ -1895,6 +1953,38 @@ export default function AdminPage() {
                         </select>
                       </div>
                     </div>
+
+                    {/* Previsão de Recebimento – datas dinâmicas */}
+                    {saleInfoData.expected_payment_dates.length > 0 && (
+                      <div className="space-y-2 mt-2">
+                        <p className="text-sm font-medium text-slate-600">Previsão de Recebimento</p>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                          {saleInfoData.expected_payment_dates.map((date, index) => (
+                            <div key={index} className="flex flex-col gap-1">
+                              <label
+                                className="text-xs font-medium text-slate-500"
+                                htmlFor={`panelPayDate-${index}`}
+                              >
+                                Parcela {index + 1}
+                              </label>
+                              <input
+                                id={`panelPayDate-${index}`}
+                                type="date"
+                                disabled={isReadOnlyView}
+                                value={date}
+                                onChange={(e) => {
+                                  const updated = [...saleInfoData.expected_payment_dates];
+                                  updated[index] = e.target.value;
+                                  setSaleInfoData((prev) => ({ ...prev, expected_payment_dates: updated }));
+                                }}
+                                className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#d4a574] disabled:opacity-50 disabled:cursor-not-allowed"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex items-center gap-4 mt-4">
                       <Button
                         onClick={handleSaveSaleInfo}
