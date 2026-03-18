@@ -193,6 +193,18 @@ export default function AdminPage() {
   const [observationsText, setObservationsText] = useState("");
   const [isSavingObservations, setIsSavingObservations] = useState(false);
   const [saveObservationsStatus, setSaveObservationsStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  // Sale info local state
+  const [saleInfoData, setSaleInfoData] = useState<{
+    sale_date: string;
+    commission_installments: string;
+    commission_payment_method: "" | "boleto" | "pix" | "webropay";
+  }>({
+    sale_date: "",
+    commission_installments: "",
+    commission_payment_method: "",
+  });
+  const [isSavingSaleInfo, setIsSavingSaleInfo] = useState(false);
+  const [saveSaleInfoStatus, setSaveSaleInfoStatus] = useState<"idle" | "saved" | "error">("idle");
 
   // Buscar processos do Supabase
   useEffect(() => {
@@ -283,6 +295,12 @@ export default function AdminPage() {
       });
       setObservationsText(process.observations || "");
       setSaveObservationsStatus("idle");
+      setSaleInfoData({
+        sale_date: process.sale_date || "",
+        commission_installments: process.commission_installments != null ? String(process.commission_installments) : "",
+        commission_payment_method: (process.commission_payment_method as "" | "boleto" | "pix" | "webropay") || "",
+      });
+      setSaveSaleInfoStatus("idle");
     }
   };
 
@@ -433,6 +451,59 @@ export default function AdminPage() {
         description: err?.message || "Tente novamente",
         type: "error",
       });
+    }
+  };
+
+  const handleSaveSaleInfo = async () => {
+    if (!selectedProcessId || isReadOnlyView) return;
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+    try {
+      setIsSavingSaleInfo(true);
+      setSaveSaleInfoStatus("idle");
+      const { error } = await supabase
+        .from("processes")
+        .update({
+          sale_date: saleInfoData.sale_date || null,
+          commission_installments: saleInfoData.commission_installments ? parseInt(saleInfoData.commission_installments, 10) : null,
+          commission_payment_method: saleInfoData.commission_payment_method || null,
+        })
+        .eq("id", selectedProcessId);
+      setIsSavingSaleInfo(false);
+      if (error) {
+        setSaveSaleInfoStatus("error");
+        showToast({ title: "Erro ao salvar informações", description: error.message || "Tente novamente", type: "error" });
+        return;
+      }
+      setSaveSaleInfoStatus("saved");
+      setProcesses((prev) =>
+        prev.map((p) =>
+          p.id === selectedProcessId
+            ? {
+                ...p,
+                sale_date: saleInfoData.sale_date || null,
+                commission_installments: saleInfoData.commission_installments ? parseInt(saleInfoData.commission_installments, 10) : null,
+                commission_payment_method: saleInfoData.commission_payment_method || null,
+              }
+            : p
+        )
+      );
+      setFilteredProcesses((prev) =>
+        prev.map((p) =>
+          p.id === selectedProcessId
+            ? {
+                ...p,
+                sale_date: saleInfoData.sale_date || null,
+                commission_installments: saleInfoData.commission_installments ? parseInt(saleInfoData.commission_installments, 10) : null,
+                commission_payment_method: saleInfoData.commission_payment_method || null,
+              }
+            : p
+        )
+      );
+    } catch (err: any) {
+      setIsSavingSaleInfo(false);
+      setSaveSaleInfoStatus("error");
+      showToast({ title: "Erro ao salvar informações", description: err?.message || "Tente novamente", type: "error" });
     }
   };
 
@@ -1775,6 +1846,66 @@ export default function AdminPage() {
                     </div>
                     <div className="text-xs text-slate-500 h-4 mt-1">
                       {saveObservationsStatus === "saved" ? "Observação salva com sucesso!" : saveObservationsStatus === "error" ? "Erro ao salvar" : ""}
+                    </div>
+                  </div>
+
+                  {/* Informações da Venda */}
+                  <div className="space-y-3">
+                    <h3 className="text-lg font-semibold text-slate-800">Informações da Venda</h3>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div className="space-y-1">
+                        <label className="text-sm font-medium text-slate-700" htmlFor="saleInfoDate">Data da Venda</label>
+                        <input
+                          id="saleInfoDate"
+                          type="date"
+                          disabled={isReadOnlyView}
+                          value={saleInfoData.sale_date}
+                          onChange={(e) => setSaleInfoData((prev) => ({ ...prev, sale_date: e.target.value }))}
+                          className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#d4a574] disabled:opacity-50 disabled:cursor-not-allowed"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-sm font-medium text-slate-700" htmlFor="saleInfoInstallments">Parcelas da Comissão</label>
+                        <input
+                          id="saleInfoInstallments"
+                          type="number"
+                          min={1}
+                          disabled={isReadOnlyView}
+                          value={saleInfoData.commission_installments}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value, 10);
+                            setSaleInfoData((prev) => ({ ...prev, commission_installments: isNaN(val) ? "" : String(val < 1 ? 1 : val) }));
+                          }}
+                          className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#d4a574] disabled:opacity-50 disabled:cursor-not-allowed"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-sm font-medium text-slate-700" htmlFor="saleInfoPayment">Forma de Pagamento</label>
+                        <select
+                          id="saleInfoPayment"
+                          disabled={isReadOnlyView}
+                          value={saleInfoData.commission_payment_method}
+                          onChange={(e) => setSaleInfoData((prev) => ({ ...prev, commission_payment_method: e.target.value as "" | "boleto" | "pix" | "webropay" }))}
+                          className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#d4a574] disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <option value="">Selecione...</option>
+                          <option value="boleto">Boleto</option>
+                          <option value="pix">PIX</option>
+                          <option value="webropay">Webropay</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between mt-2">
+                      <Button
+                        onClick={handleSaveSaleInfo}
+                        disabled={isReadOnlyView || isSavingSaleInfo}
+                        className="bg-[#d4a574] hover:bg-[#c49564] text-[#302521]"
+                      >
+                        {isSavingSaleInfo ? "Salvando..." : "Salvar Informações"}
+                      </Button>
+                      <span className="text-xs text-slate-500">
+                        {saveSaleInfoStatus === "saved" ? "Salvo com sucesso!" : saveSaleInfoStatus === "error" ? "Erro ao salvar" : ""}
+                      </span>
                     </div>
                   </div>
 
