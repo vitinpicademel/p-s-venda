@@ -89,7 +89,7 @@ type Process = {
   sale_date?: string | null;
   commission_installments?: number | null;
   commission_payment_method?: 'boleto' | 'pix' | 'webropay' | null;
-  expected_payment_dates?: { date: string; paid: boolean }[] | null;
+  expected_payment_dates?: { date: string; paid: boolean; value?: string }[] | null;
   status_steps: {
     etapa1_ficha_planilha: boolean;
     etapa2_emissao_contrato: boolean;
@@ -199,7 +199,7 @@ export default function AdminPage() {
     sale_date: string;
     commission_installments: string;
     commission_payment_method: "" | "boleto" | "pix" | "webropay";
-    expected_payment_dates: { date: string; paid: boolean }[];
+    expected_payment_dates: { date: string; paid: boolean; value?: string }[];
   }>({
     sale_date: "",
     commission_installments: "",
@@ -209,7 +209,7 @@ export default function AdminPage() {
   const [isSavingSaleInfo, setIsSavingSaleInfo] = useState(false);
   const [saveSaleInfoStatus, setSaveSaleInfoStatus] = useState<"idle" | "saved" | "error">("idle");
   // Payment dates state for create modal
-  const [createPaymentDates, setCreatePaymentDates] = useState<{ date: string; paid: boolean }[]>([{ date: "", paid: false }]);
+  const [createPaymentDates, setCreatePaymentDates] = useState<{ date: string; paid: boolean; value?: string }[]>([{ date: "", paid: false, value: "" }]);
 
   // Sync createPaymentDates array size with commissionInstallments (create modal)
   useEffect(() => {
@@ -217,7 +217,7 @@ export default function AdminPage() {
     setCreatePaymentDates((prev) => {
       if (prev.length === count) return prev;
       if (count > prev.length) {
-        return [...prev, ...Array(count - prev.length).fill(null).map(() => ({ date: "", paid: false }))];
+        return [...prev, ...Array(count - prev.length).fill(null).map(() => ({ date: "", paid: false, value: "" }))];
       }
       return prev.slice(0, count);
     });
@@ -230,7 +230,7 @@ export default function AdminPage() {
       const current = prev.expected_payment_dates;
       if (current.length === count) return prev;
       const updated = count > current.length
-        ? [...current, ...Array(count - current.length).fill(null).map(() => ({ date: "", paid: false }))]
+        ? [...current, ...Array(count - current.length).fill(null).map(() => ({ date: "", paid: false, value: "" }))]
         : current.slice(0, count);
       return { ...prev, expected_payment_dates: updated };
     });
@@ -330,7 +330,7 @@ export default function AdminPage() {
         commission_installments: process.commission_installments != null ? String(process.commission_installments) : "",
         commission_payment_method: (process.commission_payment_method as "" | "boleto" | "pix" | "webropay") || "",
         expected_payment_dates: (process.expected_payment_dates || []).map((item: any) =>
-          typeof item === "string" ? { date: item, paid: false } : item
+          typeof item === "string" ? { date: item, paid: false, value: "" } : { value: "", ...item }
         ),
       });
       setSaveSaleInfoStatus("idle");
@@ -1101,7 +1101,7 @@ export default function AdminPage() {
         commissionInstallments: "1",
         commissionPaymentMethod: "",
       });
-      setCreatePaymentDates([{ date: "", paid: false }]);
+      setCreatePaymentDates([{ date: "", paid: false, value: "" }]);
       setSelectedFile(null);
 
       showToast({
@@ -1324,6 +1324,20 @@ export default function AdminPage() {
                               }}
                               className="h-8 text-sm"
                             />
+                            <div className="flex items-center gap-1 mt-1">
+                              <span className="text-xs text-slate-500 shrink-0">R$</span>
+                              <input
+                                type="number"
+                                placeholder="0,00"
+                                value={item.value ?? ""}
+                                onChange={(e) => {
+                                  const updated = [...createPaymentDates];
+                                  updated[index] = { ...updated[index], value: e.target.value };
+                                  setCreatePaymentDates(updated);
+                                }}
+                                className="flex h-7 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[#d4a574]"
+                              />
+                            </div>
                             <div className="flex items-center gap-2 mt-1">
                               <input
                                 type="checkbox"
@@ -2017,6 +2031,21 @@ export default function AdminPage() {
                                   }}
                                   className="flex h-8 w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#d4a574] disabled:opacity-50 disabled:cursor-not-allowed"
                                 />
+                                <div className="flex items-center gap-1 mt-1">
+                                  <span className="text-xs text-slate-500 shrink-0">R$</span>
+                                  <input
+                                    type="number"
+                                    placeholder="0,00"
+                                    disabled={isReadOnlyView}
+                                    value={item.value ?? ""}
+                                    onChange={(e) => {
+                                      const updated = [...saleInfoData.expected_payment_dates];
+                                      updated[index] = { ...updated[index], value: e.target.value };
+                                      setSaleInfoData((prev) => ({ ...prev, expected_payment_dates: updated }));
+                                    }}
+                                    className="flex h-7 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[#d4a574] disabled:opacity-50 disabled:cursor-not-allowed"
+                                  />
+                                </div>
                                 <div className="flex items-center gap-2 mt-1">
                                   <input
                                     type="checkbox"
