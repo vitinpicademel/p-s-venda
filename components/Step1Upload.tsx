@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Upload, FileText, Download, X, CheckCircle2, AlertCircle } from "lucide-react";
+import { Upload, FileText, Download, X, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { StepDocument } from "@/types/database";
 import { useToast } from "@/components/ui/toast";
+
+type DocType = 'ficha' | 'planilha' | 'termo';
 
 interface Step1UploadProps {
   processId: string;
@@ -20,129 +22,78 @@ interface Step1UploadProps {
 export default function Step1Upload({ processId, isCompleted, onToggle, disabled = false }: Step1UploadProps) {
   const { showToast } = useToast();
 
-  const [fichaFile, setFichaFile] = useState<File | null>(null);
-  const [planilhaFile, setPlanilhaFile] = useState<File | null>(null);
-  const [termoFile, setTermoFile] = useState<File | null>(null);
-  const [fichaUploaded, setFichaUploaded] = useState<StepDocument | null>(null);
-  const [planilhaUploaded, setPlanilhaUploaded] = useState<StepDocument | null>(null);
-  const [termoUploaded, setTermoUploaded] = useState<StepDocument | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [isDragging, setIsDragging] = useState({ ficha: false, planilha: false, termo: false });
+  const [files, setFiles] = useState<Record<DocType, File | null>>({ ficha: null, planilha: null, termo: null });
+  const [uploaded, setUploaded] = useState<Record<DocType, StepDocument | null>>({ ficha: null, planilha: null, termo: null });
+  // Track which doc types are currently uploading
+  const [uploading, setUploading] = useState<Set<DocType>>(new Set());
+  const [isDragging, setIsDragging] = useState<Record<DocType, boolean>>({ ficha: false, planilha: false, termo: false });
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    loadExistingDocuments();
-  }, [processId]);
+  useEffect(() => { loadExistingDocuments(); }, [processId]);
 
   const loadExistingDocuments = async () => {
     const supabase = createClient();
     if (!supabase) return;
-
     try {
-      console.log("[Step1Upload] Carregando documentos do processo:", processId);
       const { data, error } = await supabase
         .from("step_documents")
         .select("*")
         .eq("process_id", processId)
         .eq("step_order", 1);
 
-      if (error) {
-        console.error("[Step1Upload] Erro ao carregar documentos:", error);
-        throw error;
-      }
-
-      console.log("[Step1Upload] Documentos encontrados:", data);
+      if (error) throw error;
 
       if (data) {
-        const ficha = data.find((doc: StepDocument) => doc.document_type === 'ficha') || null;
-        const planilha = data.find((doc: StepDocument) => doc.document_type === 'planilha') || null;
-        const termo = data.find((doc: StepDocument) => doc.document_type === 'termo') || null;
-
-        setFichaUploaded(ficha);
-        setPlanilhaUploaded(planilha);
-        setTermoUploaded(termo);
-
-        // Completo se ficha e planilha estiverem presentes (termo é opcional para processos antigos)
-        if (ficha && planilha) {
-          onToggle(true);
+        const result: Record<DocType, StepDocument | null> = { ficha: null, planilha: null, termo: null };
+        for (const doc of data as StepDocument[]) {
+          if (doc.document_type === 'ficha' || doc.document_type === 'planilha' || doc.document_type === 'termo') {
+            result[doc.document_type] = doc;
+          }
         }
+        setUploaded(result);
+        if (result.ficha && result.planilha) onToggle(true);
       }
-    } catch (error) {
-      console.error("[Step1Upload] Erro ao carregar documentos:", error);
+    } catch (err) {
+      console.error("[Step1Upload] Erro ao carregar:", err);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleFileSelect = (file: File, type: 'ficha' | 'planilha' | 'termo') => {
-    if (type === 'ficha') setFichaFile(file);
-    else if (type === 'planilha') setPlanilhaFile(file);
-    else setTermoFile(file);
-  };
+  const setFile = (type: DocType, file: File | null) =>
+    setFiles(prev => ({ ...prev, [type]: file }));
 
-  const handleDragOver = (e: React.DragEvent, type: 'ficha' | 'planilha' | 'termo') => {
+  const handleDragOver = (e: React.DragEvent, type: DocType) => {
     e.preventDefault();
     setIsDragging(prev => ({ ...prev, [type]: true }));
   };
-
-  const handleDragLeave = (type: 'ficha' | 'planilha' | 'termo') => {
+  const handleDragLeave = (type: DocType) =>
     setIsDragging(prev => ({ ...prev, [type]: false }));
-  };
-
-  const handleDrop = (e: React.DragEvent, type: 'ficha' | 'planilha' | 'termo') => {
+  const handleDrop = (e: React.DragEvent, type: DocType) => {
     e.preventDefault();
     setIsDragging(prev => ({ ...prev, [type]: false }));
-    const file = e.dataTransfer.files[0];
-    if (file) handleFileSelect(file, type);
+    const f = e.dataTransfer.files[0];
+    if (f) setFile(type, f);
   };
 
-  const removeFile = (type: 'ficha' | 'planilha' | 'termo') => {
-    if (type === 'ficha') setFichaFile(null);
-    else if (type === 'planilha') setPlanilhaFile(null);
-    else setTermoFile(null);
-  };
-
-  const uploadFile = async (file: File, type: 'ficha' | 'planilha' | 'termo'): Promise<StepDocument | null> => {
+  const uploadSingle = async (file: File, type: DocType): Promise<StepDocument> => {
     const supabase = createClient();
     if (!supabase) throw new Error("Supabase client não disponível");
 
-    // 1. Sanitize filename
-    const lastDotIndex = file.name.lastIndexOf(".");
-    const ext = lastDotIndex > 0 ? file.name.substring(lastDotIndex) : "";
-    const base = lastDotIndex > 0 ? file.name.substring(0, lastDotIndex) : file.name;
-    const sanitized = base
-      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-zA-Z0-9]/g, "_")
-      .replace(/_{2,}/g, "_")
-      .replace(/^_+|_+$/g, "")
-      .toLowerCase();
+    const ext = file.name.includes('.') ? file.name.substring(file.name.lastIndexOf('.')) : '';
     const filePath = `step-documents/${processId}/step1/${type}_${Date.now()}_${Math.random().toString(36).substring(2, 8)}${ext}`;
 
-    console.log(`[Step1Upload] Iniciando upload para storage: ${filePath}`);
-
-    // 2. Upload to storage
+    // Upload to storage
     const { error: storageError } = await supabase.storage
       .from("contracts")
       .upload(filePath, file, { upsert: true, contentType: file.type, cacheControl: "3600" });
+    if (storageError) throw storageError;
 
-    if (storageError) {
-      console.error("[Step1Upload] Erro no storage:", storageError);
-      throw storageError;
-    }
-
-    console.log("[Step1Upload] Upload no storage OK. Obtendo URL pública...");
-
-    // 3. Get public URL
     const { data: urlData } = supabase.storage.from("contracts").getPublicUrl(filePath);
-    const publicUrl = urlData.publicUrl;
-    console.log("[Step1Upload] URL pública:", publicUrl);
+    const { data: { user } } = await supabase.auth.getUser();
 
-    // 4. Get current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError) console.warn("[Step1Upload] Não foi possível obter usuário:", userError);
-
-    // 5. Check if record already exists (avoid relying on unique constraint)
-    const { data: existing, error: selectError } = await supabase
+    // Check for existing record
+    const { data: existing } = await supabase
       .from("step_documents")
       .select("id")
       .eq("process_id", processId)
@@ -150,102 +101,52 @@ export default function Step1Upload({ processId, isCompleted, onToggle, disabled
       .eq("document_type", type)
       .maybeSingle();
 
-    if (selectError) {
-      console.error("[Step1Upload] Erro ao verificar registro existente:", selectError);
-      throw selectError;
-    }
-
-    let result: StepDocument | null = null;
-
+    let result: StepDocument;
     if (existing?.id) {
-      // 6a. UPDATE existing record
-      console.log(`[Step1Upload] Registro existente encontrado (id: ${existing.id}). Fazendo UPDATE...`);
-      const { data: updated, error: updateError } = await supabase
+      const { data, error } = await supabase
         .from("step_documents")
-        .update({
-          file_url: publicUrl,
-          file_filename: file.name,
-          file_path: filePath,
-          uploaded_by: user?.id ?? null,
-        })
+        .update({ file_url: urlData.publicUrl, file_filename: file.name, file_path: filePath, uploaded_by: user?.id ?? null })
         .eq("id", existing.id)
         .select()
         .single();
-
-      if (updateError) {
-        console.error("[Step1Upload] Erro no UPDATE:", updateError);
-        throw updateError;
-      }
-      console.log("[Step1Upload] UPDATE bem-sucedido:", updated);
-      result = updated;
+      if (error) throw error;
+      result = data;
     } else {
-      // 6b. INSERT new record
-      console.log("[Step1Upload] Nenhum registro existente. Fazendo INSERT...");
-      const { data: inserted, error: insertError } = await supabase
+      const { data, error } = await supabase
         .from("step_documents")
-        .insert({
-          process_id: processId,
-          step_order: 1,
-          document_type: type,
-          file_url: publicUrl,
-          file_filename: file.name,
-          file_path: filePath,
-          uploaded_by: user?.id ?? null,
-        })
+        .insert({ process_id: processId, step_order: 1, document_type: type, file_url: urlData.publicUrl, file_filename: file.name, file_path: filePath, uploaded_by: user?.id ?? null })
         .select()
         .single();
-
-      if (insertError) {
-        console.error("[Step1Upload] Erro no INSERT:", insertError);
-        throw insertError;
-      }
-      console.log("[Step1Upload] INSERT bem-sucedido:", inserted);
-      result = inserted;
+      if (error) throw error;
+      result = data;
     }
 
     return result;
   };
 
-  const handleUpload = async () => {
-    if (!fichaFile && !planilhaFile && !termoFile) {
-      showToast({ title: "Nenhum arquivo selecionado", description: "Selecione pelo menos um arquivo.", type: "error" });
-      return;
-    }
+  // Upload each file independently with per-file loading indicator
+  const handleUploadType = async (type: DocType) => {
+    const file = files[type];
+    if (!file) return;
 
-    setIsUploading(true);
+    setUploading(prev => new Set(prev).add(type));
     try {
-      const uploads: Promise<StepDocument | null>[] = [];
-      if (fichaFile) uploads.push(uploadFile(fichaFile, 'ficha'));
-      if (planilhaFile) uploads.push(uploadFile(planilhaFile, 'planilha'));
-      if (termoFile) uploads.push(uploadFile(termoFile, 'termo'));
+      const result = await uploadSingle(file, type);
 
-      const results = await Promise.all(uploads);
-
-      let newFicha = fichaUploaded;
-      let newPlanilha = planilhaUploaded;
-      let newTermo = termoUploaded;
-
-      results.forEach(result => {
-        if (!result) return;
-        if (result.document_type === 'ficha') { setFichaUploaded(result); setFichaFile(null); newFicha = result; }
-        else if (result.document_type === 'planilha') { setPlanilhaUploaded(result); setPlanilhaFile(null); newPlanilha = result; }
-        else if (result.document_type === 'termo') { setTermoUploaded(result); setTermoFile(null); newTermo = result; }
+      // Optimistic local state update — no re-fetch needed
+      setUploaded(prev => {
+        const next = { ...prev, [type]: result };
+        if (next.ficha && next.planilha) onToggle(true);
+        return next;
       });
+      setFiles(prev => ({ ...prev, [type]: null }));
 
-      if (newFicha && newPlanilha) {
-        onToggle(true);
-      }
-
-      showToast({ title: "Arquivo(s) enviado(s) com sucesso!", type: "success" });
-    } catch (error: any) {
-      console.error("[Step1Upload] Erro no handleUpload:", error);
-      showToast({
-        title: "Falha ao enviar arquivo",
-        description: error?.message ?? "Verifique o console para detalhes.",
-        type: "error",
-      });
+      showToast({ title: "Arquivo enviado com sucesso!", type: "success" });
+    } catch (err: any) {
+      console.error(`[Step1Upload] Erro no upload de ${type}:`, err);
+      showToast({ title: "Falha ao enviar arquivo", description: err?.message ?? "Verifique o console.", type: "error" });
     } finally {
-      setIsUploading(false);
+      setUploading(prev => { const s = new Set(prev); s.delete(type); return s; });
     }
   };
 
@@ -263,53 +164,56 @@ export default function Step1Upload({ processId, isCompleted, onToggle, disabled
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-    } catch (error: any) {
-      console.error("[Step1Upload] Erro no download:", error);
-      showToast({ title: "Erro ao baixar arquivo", description: error?.message, type: "error" });
+    } catch (err: any) {
+      showToast({ title: "Erro ao baixar arquivo", description: err?.message, type: "error" });
     }
   };
 
-  const isStepCompleted = !!(fichaUploaded && planilhaUploaded);
+  const removeUploaded = (type: DocType) => {
+    setUploaded(prev => ({ ...prev, [type]: null }));
+    if (type === 'ficha' || type === 'planilha') onToggle(false);
+  };
 
-  // Reusable uploaded-file row
-  const UploadedRow = ({ doc, onRemove }: { doc: StepDocument; onRemove: () => void }) => (
-    <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
-      <div className="flex items-center gap-2 min-w-0">
-        <FileText className="h-4 w-4 text-green-600 shrink-0" />
-        <span className="text-sm text-green-800 truncate">{doc.file_filename}</span>
-        <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
-      </div>
-      <div className="flex gap-2 shrink-0">
-        <Button size="sm" variant="outline" onClick={() => downloadFile(doc)} className="h-8">
-          <Download className="h-3 w-3" />
-        </Button>
-        {!disabled && (
-          <Button size="sm" variant="outline" onClick={onRemove} className="h-8 text-red-600 border-red-200 hover:bg-red-50">
-            <X className="h-3 w-3" />
-          </Button>
-        )}
-      </div>
-    </div>
-  );
+  const isStepCompleted = !!(uploaded.ficha && uploaded.planilha);
 
-  // Reusable drop-zone
-  const DropZone = ({
-    type, file, uploaded, accept, hint, id,
-  }: {
-    type: 'ficha' | 'planilha' | 'termo';
-    file: File | null;
-    uploaded: StepDocument | null;
-    accept: string;
-    hint: string;
-    id: string;
-  }) => {
-    const onRemove = () => {
-      if (type === 'ficha') { setFichaUploaded(null); onToggle(false); }
-      else if (type === 'planilha') { setPlanilhaUploaded(null); onToggle(false); }
-      else { setTermoUploaded(null); }
-    };
+  // ── Single document slot ───────────────────────────────────────────────────
+  const DocSlot = ({
+    type, label, accept, hint, id,
+  }: { type: DocType; label: string; accept: string; hint: string; id: string }) => {
+    const isUp = uploading.has(type);
+    const file = files[type];
+    const doc = uploaded[type];
 
-    if (uploaded) return <UploadedRow doc={uploaded} onRemove={onRemove} />;
+    if (isUp) {
+      return (
+        <div className="flex items-center gap-3 p-4 border-2 border-dashed border-amber-300 bg-amber-50 rounded-lg">
+          <Loader2 className="h-5 w-5 text-amber-600 animate-spin shrink-0" />
+          <span className="text-sm text-amber-700 font-medium">Enviando arquivo...</span>
+        </div>
+      );
+    }
+
+    if (doc) {
+      return (
+        <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex items-center gap-2 min-w-0">
+            <FileText className="h-4 w-4 text-green-600 shrink-0" />
+            <span className="text-sm text-green-800 truncate">{doc.file_filename}</span>
+            <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <Button size="sm" variant="outline" onClick={() => downloadFile(doc)} className="h-8">
+              <Download className="h-3 w-3" />
+            </Button>
+            {!disabled && (
+              <Button size="sm" variant="outline" onClick={() => removeUploaded(type)} className="h-8 text-red-600 border-red-200 hover:bg-red-50">
+                <X className="h-3 w-3" />
+              </Button>
+            )}
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div
@@ -321,28 +225,28 @@ export default function Step1Upload({ processId, isCompleted, onToggle, disabled
         onDrop={(e) => handleDrop(e, type)}
       >
         <input
-          type="file"
-          accept={accept}
-          onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0], type)}
+          type="file" accept={accept} id={id} disabled={disabled}
           className="hidden"
-          id={id}
-          disabled={disabled}
+          onChange={(e) => e.target.files?.[0] && setFile(type, e.target.files[0])}
         />
-        <label htmlFor={id} className={`${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
-          <Upload className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-          <p className="text-sm text-gray-600">{file ? file.name : hint}</p>
-          <p className="text-xs text-gray-500 mt-1">
-            {type === 'ficha' ? 'Apenas arquivos PDF' : 'Excel, CSV ou PDF'}
-          </p>
-        </label>
-        {file && (
-          <Button
-            size="sm" variant="outline"
-            onClick={(e) => { e.preventDefault(); removeFile(type); }}
-            className="mt-2"
-          >
-            <X className="h-3 w-3 mr-1" /> Remover
-          </Button>
+        {file ? (
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-slate-700 truncate">{file.name}</p>
+            <div className="flex justify-center gap-2">
+              <Button size="sm" onClick={() => handleUploadType(type)} disabled={disabled} className="bg-amber-600 hover:bg-amber-700 text-white">
+                <Upload className="h-3 w-3 mr-1" /> Enviar
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setFile(type, null)}>
+                <X className="h-3 w-3 mr-1" /> Remover
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <label htmlFor={id} className={disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}>
+            <Upload className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+            <p className="text-sm text-gray-600">{hint}</p>
+            <p className="text-xs text-gray-500 mt-1">{type === 'ficha' ? 'Apenas PDF' : 'Excel, CSV ou PDF'}</p>
+          </label>
         )}
       </div>
     );
@@ -351,8 +255,9 @@ export default function Step1Upload({ processId, isCompleted, onToggle, disabled
   if (isLoading) {
     return (
       <Card>
-        <CardContent className="p-6">
-          <div className="text-center text-sm text-gray-500">Carregando documentos...</div>
+        <CardContent className="p-6 flex items-center gap-3">
+          <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+          <span className="text-sm text-slate-500">Carregando documentos...</span>
         </CardContent>
       </Card>
     );
@@ -374,7 +279,7 @@ export default function Step1Upload({ processId, isCompleted, onToggle, disabled
           <div className="flex items-center gap-2">
             {isStepCompleted && <CheckCircle2 className="h-5 w-5 text-green-600" />}
             <Switch
-              checked={!!isStepCompleted}
+              checked={isStepCompleted}
               onCheckedChange={() => { if (!disabled && isStepCompleted) onToggle(false); }}
               disabled={disabled || !isStepCompleted}
             />
@@ -384,38 +289,26 @@ export default function Step1Upload({ processId, isCompleted, onToggle, disabled
       <CardContent className="space-y-6">
         <div className="space-y-2">
           <Label className="text-sm font-medium">Ficha de Contrato (PDF)</Label>
-          <DropZone type="ficha" file={fichaFile} uploaded={fichaUploaded} accept=".pdf" hint="Arraste a ficha aqui ou clique para selecionar" id="ficha-upload" />
+          <DocSlot type="ficha" label="Ficha de Contrato" accept=".pdf" hint="Arraste a ficha aqui ou clique para selecionar" id="ficha-upload" />
         </div>
 
         <div className="space-y-2">
           <Label className="text-sm font-medium">Planilha de Cálculo</Label>
-          <DropZone type="planilha" file={planilhaFile} uploaded={planilhaUploaded} accept=".xlsx,.xls,.csv,.pdf,application/pdf" hint="Arraste a planilha aqui ou clique para selecionar" id="planilha-upload" />
+          <DocSlot type="planilha" label="Planilha de Cálculo" accept=".xlsx,.xls,.csv,.pdf,application/pdf" hint="Arraste a planilha aqui ou clique para selecionar" id="planilha-upload" />
         </div>
 
         <div className="space-y-2">
           <Label className="text-sm font-medium">Termo de Comissão <span className="text-xs text-gray-400 font-normal">(opcional)</span></Label>
-          <DropZone type="termo" file={termoFile} uploaded={termoUploaded} accept=".xlsx,.xls,.csv,.pdf,application/pdf" hint="Arraste o termo aqui ou clique para selecionar" id="termo-upload" />
+          <DocSlot type="termo" label="Termo de Comissão" accept=".xlsx,.xls,.csv,.pdf,application/pdf" hint="Arraste o termo aqui ou clique para selecionar" id="termo-upload" />
         </div>
-
-        {(fichaFile || planilhaFile || termoFile) && (
-          <div className="flex justify-end">
-            <Button onClick={handleUpload} disabled={isUploading || disabled} className="bg-amber-600 hover:bg-amber-700">
-              {isUploading ? (
-                <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />Enviando...</>
-              ) : (
-                <><Upload className="h-4 w-4 mr-2" />Enviar Arquivo(s)</>
-              )}
-            </Button>
-          </div>
-        )}
 
         {!isStepCompleted && (
           <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
             <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
             <p className="text-sm text-amber-800">
-              {fichaUploaded ? "✓ Ficha enviada" : "○ Ficha pendente"} •{" "}
-              {planilhaUploaded ? "✓ Planilha enviada" : "○ Planilha pendente"} •{" "}
-              {termoUploaded ? "✓ Termo enviado" : "○ Termo pendente"}
+              {uploaded.ficha ? "✓ Ficha enviada" : "○ Ficha pendente"} •{" "}
+              {uploaded.planilha ? "✓ Planilha enviada" : "○ Planilha pendente"} •{" "}
+              {uploaded.termo ? "✓ Termo enviado" : "○ Termo pendente"}
             </p>
           </div>
         )}
