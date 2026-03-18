@@ -363,7 +363,7 @@ export default function Step1Upload({ processId, isCompleted, onToggle, disabled
 
         {/* Upload da Planilha */}
         <div className="space-y-2">
-          <Label className="text-sm font-medium">Planilha de Cálculo (Excel)</Label>
+          <Label className="text-sm font-medium">Planilha de Cálculo</Label>
           {planilhaUploaded ? (
             <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
               <div className="flex items-center gap-2">
@@ -408,7 +408,7 @@ export default function Step1Upload({ processId, isCompleted, onToggle, disabled
             >
               <input
                 type="file"
-                accept=".xlsx,.xls,.csv"
+                accept=".xlsx,.xls,.csv,.pdf,application/pdf"
                 onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0], 'planilha')}
                 className="hidden"
                 id="planilha-upload"
@@ -419,7 +419,7 @@ export default function Step1Upload({ processId, isCompleted, onToggle, disabled
                 <p className="text-sm text-gray-600">
                   {planilhaFile ? planilhaFile.name : "Arraste a planilha aqui ou clique para selecionar"}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">Excel (.xlsx, .xls) ou CSV</p>
+                <p className="text-xs text-gray-500 mt-1">Excel, CSV ou PDF</p>
               </label>
               {planilhaFile && (
                 <Button
