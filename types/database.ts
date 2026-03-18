@@ -22,7 +22,7 @@ export type Process = {
   sale_date?: string | null;
   commission_installments?: number | null;
   commission_payment_method?: 'boleto' | 'pix' | 'webropay' | null;
-  expected_payment_dates?: string[] | null;
+  expected_payment_dates?: { date: string; paid: boolean }[] | null;
   status: 'in_progress' | 'completed';
   created_at: string;
   updated_at: string;

@@ -89,7 +89,7 @@ type Process = {
   sale_date?: string | null;
   commission_installments?: number | null;
   commission_payment_method?: 'boleto' | 'pix' | 'webropay' | null;
-  expected_payment_dates?: string[] | null;
+  expected_payment_dates?: { date: string; paid: boolean }[] | null;
   status_steps: {
     etapa1_ficha_planilha: boolean;
     etapa2_emissao_contrato: boolean;
@@ -199,7 +199,7 @@ export default function AdminPage() {
     sale_date: string;
     commission_installments: string;
     commission_payment_method: "" | "boleto" | "pix" | "webropay";
-    expected_payment_dates: string[];
+    expected_payment_dates: { date: string; paid: boolean }[];
   }>({
     sale_date: "",
     commission_installments: "",
@@ -209,14 +209,16 @@ export default function AdminPage() {
   const [isSavingSaleInfo, setIsSavingSaleInfo] = useState(false);
   const [saveSaleInfoStatus, setSaveSaleInfoStatus] = useState<"idle" | "saved" | "error">("idle");
   // Payment dates state for create modal
-  const [createPaymentDates, setCreatePaymentDates] = useState<string[]>([""]);
+  const [createPaymentDates, setCreatePaymentDates] = useState<{ date: string; paid: boolean }[]>([{ date: "", paid: false }]);
 
   // Sync createPaymentDates array size with commissionInstallments (create modal)
   useEffect(() => {
     const count = Math.max(1, parseInt(formData.commissionInstallments, 10) || 1);
     setCreatePaymentDates((prev) => {
       if (prev.length === count) return prev;
-      if (count > prev.length) return [...prev, ...Array(count - prev.length).fill("")];
+      if (count > prev.length) {
+        return [...prev, ...Array(count - prev.length).fill(null).map(() => ({ date: "", paid: false }))];
+      }
       return prev.slice(0, count);
     });
   }, [formData.commissionInstallments]);
@@ -228,7 +230,7 @@ export default function AdminPage() {
       const current = prev.expected_payment_dates;
       if (current.length === count) return prev;
       const updated = count > current.length
-        ? [...current, ...Array(count - current.length).fill("")]
+        ? [...current, ...Array(count - current.length).fill(null).map(() => ({ date: "", paid: false }))]
         : current.slice(0, count);
       return { ...prev, expected_payment_dates: updated };
     });
@@ -327,7 +329,9 @@ export default function AdminPage() {
         sale_date: process.sale_date || "",
         commission_installments: process.commission_installments != null ? String(process.commission_installments) : "",
         commission_payment_method: (process.commission_payment_method as "" | "boleto" | "pix" | "webropay") || "",
-        expected_payment_dates: process.expected_payment_dates || [],
+        expected_payment_dates: (process.expected_payment_dates || []).map((item: any) =>
+          typeof item === "string" ? { date: item, paid: false } : item
+        ),
       });
       setSaveSaleInfoStatus("idle");
     }
@@ -1097,7 +1101,7 @@ export default function AdminPage() {
         commissionInstallments: "1",
         commissionPaymentMethod: "",
       });
-      setCreatePaymentDates([""]);
+      setCreatePaymentDates([{ date: "", paid: false }]);
       setSelectedFile(null);
 
       showToast({
@@ -1296,22 +1300,49 @@ export default function AdminPage() {
                 {createPaymentDates.length > 0 && (
                   <div className="space-y-2">
                     <p className="text-sm font-medium text-slate-600">Previsão de Recebimento</p>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                      {createPaymentDates.map((date, index) => (
-                        <div key={index} className="flex flex-col gap-1">
-                          <Label htmlFor={`createPayDate-${index}`} className="text-xs text-slate-500">Parcela {index + 1}</Label>
-                          <Input
-                            id={`createPayDate-${index}`}
-                            type="date"
-                            value={date}
-                            onChange={(e) => {
-                              const updated = [...createPaymentDates];
-                              updated[index] = e.target.value;
-                              setCreatePaymentDates(updated);
-                            }}
-                          />
-                        </div>
-                      ))}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                      {createPaymentDates.map((item, index) => {
+                        const isOverdue = !item.paid && item.date && new Date(item.date).getTime() < new Date().setHours(0, 0, 0, 0);
+                        return (
+                          <div
+                            key={index}
+                            className={`flex flex-col gap-2 p-2 rounded-md border transition-colors ${
+                              item.paid ? "bg-green-50 border-green-500" : isOverdue ? "bg-red-50 border-red-500 text-red-700" : "bg-white border-slate-200"
+                            }`}
+                          >
+                            <Label htmlFor={`createPayDate-${index}`} className="text-xs font-semibold opacity-70">
+                              Parcela {index + 1}
+                            </Label>
+                            <Input
+                              id={`createPayDate-${index}`}
+                              type="date"
+                              value={item.date}
+                              onChange={(e) => {
+                                const updated = [...createPaymentDates];
+                                updated[index] = { ...updated[index], date: e.target.value };
+                                setCreatePaymentDates(updated);
+                              }}
+                              className="h-8 text-sm"
+                            />
+                            <div className="flex items-center gap-2 mt-1">
+                              <input
+                                type="checkbox"
+                                id={`createPayPaid-${index}`}
+                                checked={item.paid}
+                                onChange={(e) => {
+                                  const updated = [...createPaymentDates];
+                                  updated[index] = { ...updated[index], paid: e.target.checked };
+                                  setCreatePaymentDates(updated);
+                                }}
+                                className="h-4 w-4 rounded border-slate-300 text-green-600 focus:ring-green-500"
+                              />
+                              <label htmlFor={`createPayPaid-${index}`} className="text-xs font-medium cursor-pointer">
+                                Pago
+                              </label>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -1958,29 +1989,57 @@ export default function AdminPage() {
                     {saleInfoData.expected_payment_dates.length > 0 && (
                       <div className="space-y-2 mt-2">
                         <p className="text-sm font-medium text-slate-600">Previsão de Recebimento</p>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                          {saleInfoData.expected_payment_dates.map((date, index) => (
-                            <div key={index} className="flex flex-col gap-1">
-                              <label
-                                className="text-xs font-medium text-slate-500"
-                                htmlFor={`panelPayDate-${index}`}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                          {saleInfoData.expected_payment_dates.map((item, index) => {
+                            const isOverdue = !item.paid && item.date && new Date(item.date).getTime() < new Date().setHours(0, 0, 0, 0);
+                            return (
+                              <div
+                                key={index}
+                                className={`flex flex-col gap-2 p-2 rounded-md border transition-colors ${
+                                  item.paid ? "bg-green-50 border-green-500" : isOverdue ? "bg-red-50 border-red-500 text-red-700" : "bg-white border-slate-200"
+                                }`}
                               >
-                                Parcela {index + 1}
-                              </label>
-                              <input
-                                id={`panelPayDate-${index}`}
-                                type="date"
-                                disabled={isReadOnlyView}
-                                value={date}
-                                onChange={(e) => {
-                                  const updated = [...saleInfoData.expected_payment_dates];
-                                  updated[index] = e.target.value;
-                                  setSaleInfoData((prev) => ({ ...prev, expected_payment_dates: updated }));
-                                }}
-                                className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#d4a574] disabled:opacity-50 disabled:cursor-not-allowed"
-                              />
-                            </div>
-                          ))}
+                                <label
+                                  className="text-xs font-semibold opacity-70"
+                                  htmlFor={`panelPayDate-${index}`}
+                                >
+                                  Parcela {index + 1}
+                                </label>
+                                <input
+                                  id={`panelPayDate-${index}`}
+                                  type="date"
+                                  disabled={isReadOnlyView}
+                                  value={item.date}
+                                  onChange={(e) => {
+                                    const updated = [...saleInfoData.expected_payment_dates];
+                                    updated[index] = { ...updated[index], date: e.target.value };
+                                    setSaleInfoData((prev) => ({ ...prev, expected_payment_dates: updated }));
+                                  }}
+                                  className="flex h-8 w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#d4a574] disabled:opacity-50 disabled:cursor-not-allowed"
+                                />
+                                <div className="flex items-center gap-2 mt-1">
+                                  <input
+                                    type="checkbox"
+                                    id={`panelPayPaid-${index}`}
+                                    disabled={isReadOnlyView}
+                                    checked={item.paid}
+                                    onChange={(e) => {
+                                      const updated = [...saleInfoData.expected_payment_dates];
+                                      updated[index] = { ...updated[index], paid: e.target.checked };
+                                      setSaleInfoData((prev) => ({ ...prev, expected_payment_dates: updated }));
+                                    }}
+                                    className="h-4 w-4 rounded border-slate-300 text-green-600 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  />
+                                  <label
+                                    htmlFor={`panelPayPaid-${index}`}
+                                    className={`text-xs font-medium ${isReadOnlyView ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+                                  >
+                                    Pago
+                                  </label>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
