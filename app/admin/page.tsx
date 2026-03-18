@@ -1852,9 +1852,9 @@ export default function AdminPage() {
                   {/* Informações da Venda */}
                   <div className="space-y-3">
                     <h3 className="text-lg font-semibold text-slate-800">Informações da Venda</h3>
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      <div className="space-y-1">
-                        <label className="text-sm font-medium text-slate-700" htmlFor="saleInfoDate">Data da Venda</label>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="flex flex-col gap-2">
+                        <label className="text-sm font-medium leading-none text-slate-700" htmlFor="saleInfoDate">Data da Venda</label>
                         <input
                           id="saleInfoDate"
                           type="date"
@@ -1864,8 +1864,8 @@ export default function AdminPage() {
                           className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#d4a574] disabled:opacity-50 disabled:cursor-not-allowed"
                         />
                       </div>
-                      <div className="space-y-1">
-                        <label className="text-sm font-medium text-slate-700" htmlFor="saleInfoInstallments">Parcelas da Comissão</label>
+                      <div className="flex flex-col gap-2">
+                        <label className="text-sm font-medium leading-none text-slate-700" htmlFor="saleInfoInstallments">Parcelas da Comissão</label>
                         <input
                           id="saleInfoInstallments"
                           type="number"
@@ -1879,8 +1879,8 @@ export default function AdminPage() {
                           className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#d4a574] disabled:opacity-50 disabled:cursor-not-allowed"
                         />
                       </div>
-                      <div className="space-y-1">
-                        <label className="text-sm font-medium text-slate-700" htmlFor="saleInfoPayment">Forma de Pagamento</label>
+                      <div className="flex flex-col gap-2">
+                        <label className="text-sm font-medium leading-none text-slate-700" htmlFor="saleInfoPayment">Forma de Pagamento</label>
                         <select
                           id="saleInfoPayment"
                           disabled={isReadOnlyView}
@@ -1895,7 +1895,7 @@ export default function AdminPage() {
                         </select>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between mt-2">
+                    <div className="flex items-center gap-4 mt-4">
                       <Button
                         onClick={handleSaveSaleInfo}
                         disabled={isReadOnlyView || isSavingSaleInfo}
