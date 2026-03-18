@@ -185,7 +185,7 @@ export default function AdminPage() {
     propertyAddress: "",
     propertyValue: "",
     saleDate: "",
-    commissionInstallments: "10",
+    commissionInstallments: "1",
     commissionPaymentMethod: "" as "" | "boleto" | "pix" | "webropay",
   });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -990,7 +990,7 @@ export default function AdminPage() {
         propertyAddress: "",
         propertyValue: "",
         saleDate: "",
-        commissionInstallments: "10",
+        commissionInstallments: "1",
         commissionPaymentMethod: "",
       });
       setSelectedFile(null);
@@ -1153,13 +1153,13 @@ export default function AdminPage() {
                       id="commissionInstallments"
                       name="commissionInstallments"
                       type="number"
-                      min={10}
+                      min={1}
                       value={formData.commissionInstallments}
                       onChange={(e) => {
                         const val = parseInt(e.target.value, 10);
                         setFormData((prev) => ({
                           ...prev,
-                          commissionInstallments: isNaN(val) ? "10" : val < 10 ? "10" : String(val),
+                          commissionInstallments: isNaN(val) ? "1" : String(val),
                         }));
                       }}
                     />
