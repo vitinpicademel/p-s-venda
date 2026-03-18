@@ -24,8 +24,9 @@ export default function Step1Upload({ processId, isCompleted, onToggle, disabled
 
   const [files, setFiles] = useState<Record<DocType, File | null>>({ ficha: null, planilha: null, termo: null });
   const [uploaded, setUploaded] = useState<Record<DocType, StepDocument | null>>({ ficha: null, planilha: null, termo: null });
-  // Track which doc types are currently uploading
+  // Track which doc types are currently uploading or removing
   const [uploading, setUploading] = useState<Set<DocType>>(new Set());
+  const [removing, setRemoving] = useState<Set<DocType>>(new Set());
   const [isDragging, setIsDragging] = useState<Record<DocType, boolean>>({ ficha: false, planilha: false, termo: false });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -169,9 +170,37 @@ export default function Step1Upload({ processId, isCompleted, onToggle, disabled
     }
   };
 
-  const removeUploaded = (type: DocType) => {
-    setUploaded(prev => ({ ...prev, [type]: null }));
-    if (type === 'ficha' || type === 'planilha') onToggle(false);
+  const removeDoc = async (type: DocType) => {
+    const doc = uploaded[type];
+    if (!doc) return;
+
+    setRemoving(prev => new Set(prev).add(type));
+    try {
+      const supabase = createClient();
+      if (!supabase) throw new Error('Supabase client não disponível');
+
+      // Delete from DB
+      const { error: dbError } = await supabase
+        .from('step_documents')
+        .delete()
+        .eq('id', doc.id);
+      if (dbError) throw dbError;
+
+      // Delete from storage (best-effort, don't block on failure)
+      await supabase.storage.from('contracts').remove([doc.file_path]).catch((e: unknown) =>
+        console.warn('[Step1Upload] Aviso: não foi possível remover do storage:', e)
+      );
+
+      // Only update local state after DB success
+      setUploaded(prev => ({ ...prev, [type]: null }));
+      if (type === 'ficha' || type === 'planilha') onToggle(false);
+      showToast({ title: 'Arquivo removido com sucesso!', type: 'success' });
+    } catch (err: any) {
+      console.error(`[Step1Upload] Erro ao remover ${type}:`, err);
+      showToast({ title: 'Falha ao remover arquivo', description: err?.message, type: 'error' });
+    } finally {
+      setRemoving(prev => { const s = new Set(prev); s.delete(type); return s; });
+    }
   };
 
   const isStepCompleted = !!(uploaded.ficha && uploaded.planilha);
@@ -181,14 +210,15 @@ export default function Step1Upload({ processId, isCompleted, onToggle, disabled
     type, label, accept, hint, id,
   }: { type: DocType; label: string; accept: string; hint: string; id: string }) => {
     const isUp = uploading.has(type);
+    const isRm = removing.has(type);
     const file = files[type];
     const doc = uploaded[type];
 
-    if (isUp) {
+    if (isUp || isRm) {
       return (
         <div className="flex items-center gap-3 p-4 border-2 border-dashed border-amber-300 bg-amber-50 rounded-lg">
           <Loader2 className="h-5 w-5 text-amber-600 animate-spin shrink-0" />
-          <span className="text-sm text-amber-700 font-medium">Enviando arquivo...</span>
+          <span className="text-sm text-amber-700 font-medium">{isRm ? 'Removendo arquivo...' : 'Enviando arquivo...'}</span>
         </div>
       );
     }
@@ -206,7 +236,7 @@ export default function Step1Upload({ processId, isCompleted, onToggle, disabled
               <Download className="h-3 w-3" />
             </Button>
             {!disabled && (
-              <Button size="sm" variant="outline" onClick={() => removeUploaded(type)} className="h-8 text-red-600 border-red-200 hover:bg-red-50">
+              <Button size="sm" variant="outline"              onClick={() => removeDoc(type)} className="h-8 text-red-600 border-red-200 hover:bg-red-50">
                 <X className="h-3 w-3" />
               </Button>
             )}
