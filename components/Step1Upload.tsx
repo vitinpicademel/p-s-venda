@@ -19,13 +19,14 @@ interface Step1UploadProps {
 export default function Step1Upload({ processId, isCompleted, onToggle, disabled = false }: Step1UploadProps) {
   const [fichaFile, setFichaFile] = useState<File | null>(null);
   const [planilhaFile, setPlanilhaFile] = useState<File | null>(null);
+  const [termoFile, setTermoFile] = useState<File | null>(null);
   const [fichaUploaded, setFichaUploaded] = useState<StepDocument | null>(null);
   const [planilhaUploaded, setPlanilhaUploaded] = useState<StepDocument | null>(null);
+  const [termoUploaded, setTermoUploaded] = useState<StepDocument | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [isDragging, setIsDragging] = useState({ ficha: false, planilha: false });
+  const [isDragging, setIsDragging] = useState({ ficha: false, planilha: false, termo: false });
   const [isLoading, setIsLoading] = useState(true);
 
-  // Carregar documentos já existentes
   useEffect(() => {
     loadExistingDocuments();
   }, [processId]);
@@ -46,12 +47,13 @@ export default function Step1Upload({ processId, isCompleted, onToggle, disabled
       if (data) {
         const ficha = data.find((doc: StepDocument) => doc.document_type === 'ficha');
         const planilha = data.find((doc: StepDocument) => doc.document_type === 'planilha');
-        
+        const termo = data.find((doc: StepDocument) => doc.document_type === 'termo');
+
         setFichaUploaded(ficha || null);
         setPlanilhaUploaded(planilha || null);
+        setTermoUploaded(termo || null);
 
-        // Se ambos os arquivos estão uploaded, marca como concluído
-        if (ficha && planilha) {
+        if (ficha && planilha && termo) {
           onToggle(true);
         }
       }
@@ -62,89 +64,68 @@ export default function Step1Upload({ processId, isCompleted, onToggle, disabled
     }
   };
 
-  const handleFileSelect = (file: File, type: 'ficha' | 'planilha') => {
-    if (file.type === "application/pdf" || file.type === "application/vnd.ms-excel" || 
-        file.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") {
-      if (type === 'ficha') {
-        setFichaFile(file);
-      } else {
-        setPlanilhaFile(file);
-      }
+  const handleFileSelect = (file: File, type: 'ficha' | 'planilha' | 'termo') => {
+    if (type === 'ficha') {
+      setFichaFile(file);
+    } else if (type === 'planilha') {
+      setPlanilhaFile(file);
     } else {
-      alert(`Por favor, selecione um arquivo PDF (para ficha) ou Excel (para planilha)`);
+      setTermoFile(file);
     }
   };
 
-  const handleDragOver = (e: React.DragEvent, type: 'ficha' | 'planilha') => {
+  const handleDragOver = (e: React.DragEvent, type: 'ficha' | 'planilha' | 'termo') => {
     e.preventDefault();
     setIsDragging(prev => ({ ...prev, [type]: true }));
   };
 
-  const handleDragLeave = (type: 'ficha' | 'planilha') => {
+  const handleDragLeave = (type: 'ficha' | 'planilha' | 'termo') => {
     setIsDragging(prev => ({ ...prev, [type]: false }));
   };
 
-  const handleDrop = (e: React.DragEvent, type: 'ficha' | 'planilha') => {
+  const handleDrop = (e: React.DragEvent, type: 'ficha' | 'planilha' | 'termo') => {
     e.preventDefault();
     setIsDragging(prev => ({ ...prev, [type]: false }));
-
     const file = e.dataTransfer.files[0];
-    if (file) {
-      handleFileSelect(file, type);
-    }
+    if (file) handleFileSelect(file, type);
   };
 
-  const removeFile = (type: 'ficha' | 'planilha') => {
-    if (type === 'ficha') {
-      setFichaFile(null);
-    } else {
-      setPlanilhaFile(null);
-    }
+  const removeFile = (type: 'ficha' | 'planilha' | 'termo') => {
+    if (type === 'ficha') setFichaFile(null);
+    else if (type === 'planilha') setPlanilhaFile(null);
+    else setTermoFile(null);
   };
 
-  const uploadFile = async (file: File, type: 'ficha' | 'planilha'): Promise<StepDocument | null> => {
+  const uploadFile = async (file: File, type: 'ficha' | 'planilha' | 'termo'): Promise<StepDocument | null> => {
     const supabase = createClient();
     if (!supabase) throw new Error("Erro de conexão");
 
-    // Sanitizar nome do arquivo
-    const sanitizeFileName = (fileName: string, type: 'ficha' | 'planilha'): string => {
+    const sanitizeFileName = (fileName: string, type: string): string => {
       const lastDotIndex = fileName.lastIndexOf(".");
       const nameWithoutExt = lastDotIndex > 0 ? fileName.substring(0, lastDotIndex) : fileName;
       const extension = lastDotIndex > 0 ? fileName.substring(lastDotIndex) : "";
-
       const normalized = nameWithoutExt.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
       const sanitized = normalized
         .replace(/[^a-zA-Z0-9]/g, "_")
         .replace(/_{2,}/g, "_")
         .replace(/^_+|_+$/g, "")
         .toLowerCase();
-
       const timestamp = Date.now();
       const random = Math.random().toString(36).substring(2, 8);
-
       return `${type}_${timestamp}_${random}${extension}`;
     };
 
     const sanitizedFileName = sanitizeFileName(file.name, type);
     const filePath = `step-documents/${processId}/step1/${sanitizedFileName}`;
 
-    // Upload para storage
     const { error: uploadError } = await supabase.storage
       .from("contracts")
-      .upload(filePath, file, {
-        upsert: true,
-        contentType: file.type,
-        cacheControl: "3600",
-      });
+      .upload(filePath, file, { upsert: true, contentType: file.type, cacheControl: "3600" });
 
     if (uploadError) throw uploadError;
 
-    // Obter URL pública
-    const { data: urlData } = supabase.storage
-      .from("contracts")
-      .getPublicUrl(filePath);
+    const { data: urlData } = supabase.storage.from("contracts").getPublicUrl(filePath);
 
-    // Salvar no banco
     const { data: { user } } = await supabase.auth.getUser();
     const { data, error } = await supabase
       .from("step_documents")
@@ -156,19 +137,16 @@ export default function Step1Upload({ processId, isCompleted, onToggle, disabled
         file_filename: file.name,
         file_path: filePath,
         uploaded_by: user?.id,
-      }, {
-        onConflict: 'process_id,step_order,document_type'
-      })
+      }, { onConflict: 'process_id,step_order,document_type' })
       .select()
       .single();
 
     if (error) throw error;
-
     return data;
   };
 
   const handleUpload = async () => {
-    if (!fichaFile && !planilhaFile) {
+    if (!fichaFile && !planilhaFile && !termoFile) {
       alert("Por favor, selecione pelo menos um arquivo para upload");
       return;
     }
@@ -176,37 +154,27 @@ export default function Step1Upload({ processId, isCompleted, onToggle, disabled
     setIsUploading(true);
     try {
       const uploadPromises = [];
-      
-      if (fichaFile) {
-        uploadPromises.push(uploadFile(fichaFile, 'ficha'));
-      }
-      
-      if (planilhaFile) {
-        uploadPromises.push(uploadFile(planilhaFile, 'planilha'));
-      }
+      if (fichaFile) uploadPromises.push(uploadFile(fichaFile, 'ficha'));
+      if (planilhaFile) uploadPromises.push(uploadFile(planilhaFile, 'planilha'));
+      if (termoFile) uploadPromises.push(uploadFile(termoFile, 'termo'));
 
       const results = await Promise.all(uploadPromises);
-      
-      // Atualizar estado com os arquivos uploaded
+
+      let newFicha = fichaUploaded;
+      let newPlanilha = planilhaUploaded;
+      let newTermo = termoUploaded;
+
       results.forEach(result => {
         if (result) {
-          if (result.document_type === 'ficha') {
-            setFichaUploaded(result);
-            setFichaFile(null);
-          } else if (result.document_type === 'planilha') {
-            setPlanilhaUploaded(result);
-            setPlanilhaFile(null);
-          }
+          if (result.document_type === 'ficha') { setFichaUploaded(result); setFichaFile(null); newFicha = result; }
+          else if (result.document_type === 'planilha') { setPlanilhaUploaded(result); setPlanilhaFile(null); newPlanilha = result; }
+          else if (result.document_type === 'termo') { setTermoUploaded(result); setTermoFile(null); newTermo = result; }
         }
       });
 
-      // Verificar se ambos estão completos
-      if (fichaUploaded || results.find(r => r?.document_type === 'ficha')) {
-        if (planilhaUploaded || results.find(r => r?.document_type === 'planilha')) {
-          onToggle(true);
-        }
+      if (newFicha && newPlanilha && newTermo) {
+        onToggle(true);
       }
-
     } catch (error) {
       console.error("Erro no upload:", error);
       alert("Erro ao fazer upload dos arquivos. Tente novamente.");
@@ -219,13 +187,8 @@ export default function Step1Upload({ processId, isCompleted, onToggle, disabled
     try {
       const supabase = createClient();
       if (!supabase) return;
-
-      const { data, error } = await supabase.storage
-        .from('contracts')
-        .download(doc.file_path);
-
+      const { data, error } = await supabase.storage.from('contracts').download(doc.file_path);
       if (error) throw error;
-
       const url = window.URL.createObjectURL(data);
       const link = document.createElement('a');
       link.href = url;
@@ -234,14 +197,97 @@ export default function Step1Upload({ processId, isCompleted, onToggle, disabled
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-
     } catch (error) {
       console.error("Erro no download:", error);
       alert("Erro ao baixar arquivo. Tente novamente.");
     }
   };
 
-  const isStepCompleted = fichaUploaded && planilhaUploaded;
+  const isStepCompleted = fichaUploaded && planilhaUploaded && termoUploaded;
+
+  // Reusable uploaded-file row
+  const UploadedRow = ({ doc, onRemove }: { doc: StepDocument; onRemove: () => void }) => (
+    <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+      <div className="flex items-center gap-2">
+        <FileText className="h-4 w-4 text-green-600" />
+        <span className="text-sm text-green-800">{doc.file_filename}</span>
+        <CheckCircle2 className="h-4 w-4 text-green-600" />
+      </div>
+      <div className="flex gap-2">
+        <Button size="sm" variant="outline" onClick={() => downloadFile(doc)} className="h-8">
+          <Download className="h-3 w-3" />
+        </Button>
+        {!disabled && (
+          <Button size="sm" variant="outline" onClick={onRemove} className="h-8 text-red-600 border-red-200 hover:bg-red-50">
+            <X className="h-3 w-3" />
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+
+  // Reusable drop-zone
+  const DropZone = ({
+    type, file, uploaded, accept, hint, id,
+  }: {
+    type: 'ficha' | 'planilha' | 'termo';
+    file: File | null;
+    uploaded: StepDocument | null;
+    accept: string;
+    hint: string;
+    id: string;
+  }) => {
+    if (uploaded) {
+      return (
+        <UploadedRow
+          doc={uploaded}
+          onRemove={() => {
+            if (type === 'ficha') { setFichaUploaded(null); onToggle(false); }
+            else if (type === 'planilha') { setPlanilhaUploaded(null); onToggle(false); }
+            else { setTermoUploaded(null); onToggle(false); }
+          }}
+        />
+      );
+    }
+
+    return (
+      <div
+        className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
+          isDragging[type] ? 'border-amber-400 bg-amber-50' : 'border-gray-300 hover:border-gray-400'
+        }`}
+        onDragOver={(e) => handleDragOver(e, type)}
+        onDragLeave={() => handleDragLeave(type)}
+        onDrop={(e) => handleDrop(e, type)}
+      >
+        <input
+          type="file"
+          accept={accept}
+          onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0], type)}
+          className="hidden"
+          id={id}
+          disabled={disabled}
+        />
+        <label htmlFor={id} className="cursor-pointer">
+          <Upload className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+          <p className="text-sm text-gray-600">{file ? file.name : hint}</p>
+          <p className="text-xs text-gray-500 mt-1">
+            {type === 'ficha' ? 'Apenas arquivos PDF' : 'Excel, CSV ou PDF'}
+          </p>
+        </label>
+        {file && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={(e) => { e.preventDefault(); removeFile(type); }}
+            className="mt-2"
+          >
+            <X className="h-3 w-3 mr-1" />
+            Remover
+          </Button>
+        )}
+      </div>
+    );
+  };
 
   if (isLoading) {
     return (
@@ -262,185 +308,62 @@ export default function Step1Upload({ processId, isCompleted, onToggle, disabled
               <FileText className={`h-5 w-5 ${isStepCompleted ? 'text-green-600' : 'text-amber-600'}`} />
             </div>
             <div>
-              <CardTitle className="text-lg">1. Ficha de contrato e Planilha de Cálculo</CardTitle>
-              <CardDescription>Upload da ficha de contrato e planilha de cálculo</CardDescription>
+              <CardTitle className="text-lg">1. Ficha de contrato, Planilha de Cálculo e Termo de Comissão</CardTitle>
+              <CardDescription>Upload dos documentos da etapa 1</CardDescription>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {isStepCompleted && (
-              <CheckCircle2 className="h-5 w-5 text-green-600" />
-            )}
+            {isStepCompleted && <CheckCircle2 className="h-5 w-5 text-green-600" />}
             <Switch
               checked={!!isStepCompleted}
-              onCheckedChange={() => {
-                if (!disabled && isStepCompleted) {
-                  onToggle(false);
-                }
-              }}
+              onCheckedChange={() => { if (!disabled && isStepCompleted) onToggle(false); }}
               disabled={disabled || !isStepCompleted}
             />
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Upload da Ficha */}
+        {/* Ficha */}
         <div className="space-y-2">
           <Label className="text-sm font-medium">Ficha de Contrato (PDF)</Label>
-          {fichaUploaded ? (
-            <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
-              <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-green-600" />
-                <span className="text-sm text-green-800">{fichaUploaded.file_filename}</span>
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => downloadFile(fichaUploaded!)}
-                  className="h-8"
-                >
-                  <Download className="h-3 w-3" />
-                </Button>
-                {!disabled && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setFichaUploaded(null);
-                      onToggle(false);
-                    }}
-                    className="h-8 text-red-600 border-red-200 hover:bg-red-50"
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div
-              className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
-                isDragging.ficha 
-                  ? 'border-amber-400 bg-amber-50' 
-                  : 'border-gray-300 hover:border-gray-400'
-              }`}
-              onDragOver={(e) => handleDragOver(e, 'ficha')}
-              onDragLeave={() => handleDragLeave('ficha')}
-              onDrop={(e) => handleDrop(e, 'ficha')}
-            >
-              <input
-                type="file"
-                accept=".pdf"
-                onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0], 'ficha')}
-                className="hidden"
-                id="ficha-upload"
-                disabled={disabled}
-              />
-              <label htmlFor="ficha-upload" className="cursor-pointer">
-                <Upload className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                <p className="text-sm text-gray-600">
-                  {fichaFile ? fichaFile.name : "Arraste a ficha aqui ou clique para selecionar"}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">Apenas arquivos PDF</p>
-              </label>
-              {fichaFile && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    removeFile('ficha');
-                  }}
-                  className="mt-2"
-                >
-                  <X className="h-3 w-3 mr-1" />
-                  Remover
-                </Button>
-              )}
-            </div>
-          )}
+          <DropZone
+            type="ficha"
+            file={fichaFile}
+            uploaded={fichaUploaded}
+            accept=".pdf"
+            hint="Arraste a ficha aqui ou clique para selecionar"
+            id="ficha-upload"
+          />
         </div>
 
-        {/* Upload da Planilha */}
+        {/* Planilha */}
         <div className="space-y-2">
           <Label className="text-sm font-medium">Planilha de Cálculo</Label>
-          {planilhaUploaded ? (
-            <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
-              <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-green-600" />
-                <span className="text-sm text-green-800">{planilhaUploaded.file_filename}</span>
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => downloadFile(planilhaUploaded!)}
-                  className="h-8"
-                >
-                  <Download className="h-3 w-3" />
-                </Button>
-                {!disabled && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setPlanilhaUploaded(null);
-                      onToggle(false);
-                    }}
-                    className="h-8 text-red-600 border-red-200 hover:bg-red-50"
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div
-              className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
-                isDragging.planilha 
-                  ? 'border-amber-400 bg-amber-50' 
-                  : 'border-gray-300 hover:border-gray-400'
-              }`}
-              onDragOver={(e) => handleDragOver(e, 'planilha')}
-              onDragLeave={() => handleDragLeave('planilha')}
-              onDrop={(e) => handleDrop(e, 'planilha')}
-            >
-              <input
-                type="file"
-                accept=".xlsx,.xls,.csv,.pdf,application/pdf"
-                onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0], 'planilha')}
-                className="hidden"
-                id="planilha-upload"
-                disabled={disabled}
-              />
-              <label htmlFor="planilha-upload" className="cursor-pointer">
-                <Upload className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                <p className="text-sm text-gray-600">
-                  {planilhaFile ? planilhaFile.name : "Arraste a planilha aqui ou clique para selecionar"}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">Excel, CSV ou PDF</p>
-              </label>
-              {planilhaFile && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    removeFile('planilha');
-                  }}
-                  className="mt-2"
-                >
-                  <X className="h-3 w-3 mr-1" />
-                  Remover
-                </Button>
-              )}
-            </div>
-          )}
+          <DropZone
+            type="planilha"
+            file={planilhaFile}
+            uploaded={planilhaUploaded}
+            accept=".xlsx,.xls,.csv,.pdf,application/pdf"
+            hint="Arraste a planilha aqui ou clique para selecionar"
+            id="planilha-upload"
+          />
+        </div>
+
+        {/* Termo de Comissão */}
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Termo de Comissão</Label>
+          <DropZone
+            type="termo"
+            file={termoFile}
+            uploaded={termoUploaded}
+            accept=".xlsx,.xls,.csv,.pdf,application/pdf"
+            hint="Arraste o termo aqui ou clique para selecionar"
+            id="termo-upload"
+          />
         </div>
 
         {/* Botão de Upload */}
-        {(fichaFile || planilhaFile) && (
+        {(fichaFile || planilhaFile || termoFile) && (
           <div className="flex justify-end">
             <Button
               onClick={handleUpload}
@@ -467,8 +390,9 @@ export default function Step1Upload({ processId, isCompleted, onToggle, disabled
           <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
             <AlertCircle className="h-4 w-4 text-amber-600" />
             <p className="text-sm text-amber-800">
-              {fichaUploaded ? "✓ Ficha enviada" : "○ Ficha pendente"} • 
-              {planilhaUploaded ? "✓ Planilha enviada" : "○ Planilha pendente"}
+              {fichaUploaded ? "✓ Ficha enviada" : "○ Ficha pendente"} •{" "}
+              {planilhaUploaded ? "✓ Planilha enviada" : "○ Planilha pendente"} •{" "}
+              {termoUploaded ? "✓ Termo enviado" : "○ Termo pendente"}
             </p>
           </div>
         )}

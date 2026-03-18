@@ -45,7 +45,7 @@ export type StepDocument = {
   id: string;
   process_id: string;
   step_order: number;
-  document_type: 'ficha' | 'planilha';
+  document_type: 'ficha' | 'planilha' | 'termo';
   file_url: string;
   file_filename: string;
   file_path: string;
