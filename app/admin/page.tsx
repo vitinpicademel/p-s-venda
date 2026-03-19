@@ -1861,13 +1861,14 @@ export default function AdminPage() {
                                 className="w-32"
                               >
                                 <option value="">Não definido</option>
-                                <optgroup label="Corretores">
+                                <optgroup label="Correspondente">
                                   <option value="REM">REM</option>
                                   <option value="Euripedes">Eurípedes</option>
                                   <option value="Silvia">Silvia</option>
                                   <option value="Dreice">Dreice</option>
                                   <option value="Italo">Italo</option>
                                   <option value="Gustavo">Gustavo</option>
+                                  <option value="Sene">Sene</option>
                                 </optgroup>
                                 <option value="A vista">À vista</option>
                                 <optgroup label="Incorporadoras">
